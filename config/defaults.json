@@ -1,0 +1,11 @@
+{
+  "poll_interval_seconds": 30,
+  "activity_timeout_seconds": 10,
+  "proxy_port": 9999,
+  "detection_method": "auto",
+  "position": {
+    "x": null,
+    "y": null
+  },
+  "window_locked": false
+}

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenClaw Setup</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+      font-size: 12px;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .setup-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    h1 {
+      font-size: 20px;
+      color: #cd7f5d;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .robot-icon {
+      width: 24px;
+      height: 24px;
+      display: inline-block;
+      background: #cd7f5d;
+      mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="10" y="2" width="4" height="2"/><rect x="6" y="4" width="12" height="8"/><rect x="8" y="6" width="2" height="2" fill="white"/><rect x="14" y="6" width="2" height="2" fill="white"/><rect x="4" y="12" width="16" height="10"/><rect x="6" y="14" width="2" height="2"/></svg>') center/contain no-repeat;
+    }
+
+    .description {
+      color: #888;
+      line-height: 1.5;
+    }
+
+    .setup-steps {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      overflow-y: auto;
+      padding-bottom: 20px;
+    }
+
+    .step {
+      background: #2a2a2a;
+      padding: 15px;
+      border-left: 3px solid #cd7f5d;
+    }
+
+    .step-title {
+      color: #cd7f5d;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    label {
+      color: #888;
+      font-size: 11px;
+    }
+
+    input[type="text"],
+    input[type="password"] {
+      background: #1a1a1a;
+      border: 1px solid #444;
+      color: #e0e0e0;
+      padding: 8px;
+      font-family: monospace;
+      font-size: 11px;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #cd7f5d;
+    }
+
+    .info-text {
+      color: #666;
+      font-size: 10px;
+      margin-top: 5px;
+    }
+
+    .code-block {
+      background: #0a0a0a;
+      padding: 8px;
+      border: 1px solid #333;
+      color: #39ff14;
+      font-size: 10px;
+      user-select: text;
+      cursor: text;
+      margin: 5px 0;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      padding-top: 10px;
+      border-top: 1px solid #333;
+    }
+
+    button {
+      background: #cd7f5d;
+      border: none;
+      color: #1a1a1a;
+      padding: 8px 16px;
+      font-family: monospace;
+      font-size: 11px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #e69875;
+    }
+
+    button:active {
+      background: #a65d42;
+    }
+
+    button:disabled {
+      background: #444;
+      color: #666;
+      cursor: not-allowed;
+    }
+
+    button.secondary {
+      background: #444;
+      color: #888;
+    }
+
+    button.secondary:hover {
+      background: #555;
+    }
+
+    .status {
+      padding: 10px;
+      margin-top: 10px;
+      background: #2a2a2a;
+      border: 1px solid #444;
+      color: #888;
+      font-size: 11px;
+      display: none;
+    }
+
+    .status.error {
+      border-color: #ff3333;
+      color: #ff3333;
+    }
+
+    .status.success {
+      border-color: #39ff14;
+      color: #39ff14;
+    }
+
+    .status.visible {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="setup-container">
+    <h1>
+      <span class="robot-icon"></span>
+      OpenClaw Pet Setup
+    </h1>
+
+    <div class="description">
+      Welcome! OpenClaw Pet needs your Anthropic API key to show token usage.
+    </div>
+
+    <div class="setup-steps">
+      <div class="step">
+        <div class="step-title">Option 1: Login with Claude Account (Recommended)</div>
+        <div class="info-text">
+          Track your Claude subscription usage with local tracking
+        </div>
+        <button id="claude-btn" onclick="loginWithClaudeSubscription()" style="margin-top: 10px; background: #cd7f5d; width: 100%; padding: 12px;">
+          Login with Claude Account
+        </button>
+        <div class="info-text" style="margin-top: 10px; color: #39ff14;">
+          ✓ Tracks your actual API calls locally<br>
+          ✓ Daily reset at midnight<br>
+          ✓ Activity detection when Claude is active<br>
+          ✓ Works with all Claude subscriptions
+        </div>
+        <div class="info-text" style="margin-top: 10px; color: #888; font-size: 10px;">
+          Note: Due to API limitations, this tracks usage locally based on detected activity. For exact usage, check claude.ai directly.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-title">Option 2: Use API Key</div>
+        <div class="input-group">
+          <label for="api-key">Enter your Anthropic API key:</label>
+          <input type="password" id="api-key" placeholder="sk-ant-api03-..." />
+          <div class="info-text">For API-based token tracking (developers)</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-title">Step 2: Configure Proxy (Optional)</div>
+        <div class="info-text">
+          To detect Claude Code activity, configure it to use our proxy:
+        </div>
+        <div class="code-block">
+          export ANTHROPIC_API_BASE="http://localhost:9999"
+        </div>
+        <div class="info-text">Add this to your ~/.zshrc or ~/.bashrc file</div>
+      </div>
+
+      <div class="step">
+        <div class="step-title">Step 3: Get Your API Key</div>
+        <div class="info-text">
+          Don't have an API key? Get one from:
+          <div class="code-block">https://console.anthropic.com/settings/keys</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="status" id="status"></div>
+
+    <div class="buttons">
+      <button class="secondary" onclick="skipSetup()">Skip</button>
+      <button id="save-btn" onclick="saveApiKey()">Save & Launch</button>
+    </div>
+  </div>
+
+  <script>
+    async function saveClaudeToken() {
+      const claudeToken = document.getElementById('claude-token').value.trim();
+      const status = document.getElementById('status');
+      const tokenBtn = document.getElementById('claude-token-btn');
+
+      if (!claudeToken) {
+        showStatus('Please enter your Claude token', 'error');
+        return;
+      }
+
+      tokenBtn.disabled = true;
+      tokenBtn.textContent = 'Saving...';
+
+      try {
+        // Save the Claude token
+        const result = await window.electronAPI.setClaudeToken(claudeToken);
+
+        if (result.success) {
+          showStatus('Claude token saved! Launching OpenClaw Pet with real usage data...', 'success');
+          setTimeout(() => {
+            window.close();
+          }, 1500);
+        } else {
+          showStatus(result.error || 'Failed to save token', 'error');
+          tokenBtn.disabled = false;
+          tokenBtn.textContent = 'Use Claude Token';
+        }
+      } catch (error) {
+        showStatus('Failed to save token', 'error');
+        tokenBtn.disabled = false;
+        tokenBtn.textContent = 'Use Claude Token';
+      }
+    }
+
+    async function loginWithClaudeSubscription() {
+      const claudeBtn = document.getElementById('claude-btn');
+      const status = document.getElementById('status');
+
+      claudeBtn.disabled = true;
+      claudeBtn.textContent = 'Opening Claude login...';
+
+      try {
+        const result = await window.electronAPI.loginWithClaude();
+
+        if (result.success) {
+          showStatus('Successfully connected to your Claude account!', 'success');
+          setTimeout(() => {
+            window.close();
+          }, 1500);
+        } else {
+          showStatus(result.error || 'Login failed. Please try again.', 'error');
+          claudeBtn.disabled = false;
+          claudeBtn.textContent = 'Login with Claude Account';
+        }
+      } catch (error) {
+        showStatus('Failed to start login', 'error');
+        claudeBtn.disabled = false;
+        claudeBtn.textContent = 'Login with Claude Account';
+      }
+    }
+
+    function saveApiKey() {
+      const apiKey = document.getElementById('api-key').value.trim();
+      const status = document.getElementById('status');
+      const saveBtn = document.getElementById('save-btn');
+
+      if (!apiKey) {
+        showStatus('Please enter your API key', 'error');
+        return;
+      }
+
+      if (!apiKey.startsWith('sk-ant-')) {
+        showStatus('Invalid API key format (should start with sk-ant-)', 'error');
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+
+      // Set the API key as environment variable
+      window.electronAPI.setEnvApiKey(apiKey).then(() => {
+        showStatus('API key saved! Launching OpenClaw Pet...', 'success');
+        setTimeout(() => {
+          window.close();
+        }, 1500);
+      }).catch((error) => {
+        showStatus('Failed to save API key', 'error');
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save & Launch';
+      });
+    }
+
+    function skipSetup() {
+      if (confirm('OpenClaw Pet will run in demo mode without an API key. Continue?')) {
+        window.electronAPI.setEnvApiKey('demo').then(() => {
+          window.close();
+        });
+      }
+    }
+
+    function showStatus(message, type) {
+      const status = document.getElementById('status');
+      status.textContent = message;
+      status.className = `status visible ${type}`;
+    }
+
+    // Allow Enter key to save
+    document.getElementById('api-key').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        saveApiKey();
+      }
+    });
+
+    // Focus on input
+    document.getElementById('api-key').focus();
+  </script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenClaw Pet</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="widget-container">
+    <!-- Robot Container -->
+    <div id="robot-container"></div>
+
+    <!-- Stats Display -->
+    <div id="stats-container">
+      <!-- Token Usage Bar -->
+      <div id="token-bar-wrapper">
+        <div id="token-bar">
+          <div id="token-fill"></div>
+        </div>
+        <span id="token-percentage">-- %</span>
+      </div>
+
+      <!-- Reset Countdown -->
+      <div id="countdown-wrapper">
+        <span id="countdown-text">no api key</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="robot.js"></script>
+  <script src="stats.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

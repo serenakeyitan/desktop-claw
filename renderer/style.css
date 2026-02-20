@@ -1,0 +1,256 @@
+/* Reset and Base Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  font-size: 10px;
+  color: #888;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+/* Widget Container */
+#widget-container {
+  width: 180px;
+  height: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  position: relative;
+  -webkit-app-region: drag;
+}
+
+/* Robot Container */
+#robot-container {
+  width: 96px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  -webkit-app-region: no-drag;
+  cursor: pointer;
+}
+
+/* Pixel Robot SVG */
+.pixel-robot {
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+
+/* Robot States */
+.pixel-robot.state-idle {
+  animation: float 3s ease-in-out infinite;
+}
+
+.pixel-robot.state-active.vibrating {
+  animation: vibrate 0.2s linear infinite;
+}
+
+/* Robot Pixel Elements */
+.eye-pixel {
+  transition: fill 0.3s ease;
+}
+
+.pixel-robot.state-idle .eye-pixel {
+  animation: blink 4s infinite;
+}
+
+.pixel-robot.state-active .eye-pixel {
+  animation: pulse 0.5s ease-in-out infinite;
+  filter: drop-shadow(0 0 2px currentColor);
+}
+
+/* Stats Container */
+#stats-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  -webkit-app-region: no-drag;
+}
+
+/* Token Bar */
+#token-bar-wrapper {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#token-bar {
+  flex: 1;
+  height: 3px;
+  background: #222;
+  position: relative;
+  overflow: hidden;
+  border: none;
+}
+
+#token-fill {
+  height: 100%;
+  width: 0%;
+  background: #39ff14;
+  transition: width 0.3s ease, background-color 0.3s ease;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+/* Token fill colors based on percentage */
+#token-fill.high {
+  background: #39ff14;
+}
+
+#token-fill.medium {
+  background: #ffcc00;
+}
+
+#token-fill.low {
+  background: #ff3333;
+}
+
+/* Segmented pixel effect for token bar */
+#token-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.1) 2px,
+    rgba(0, 0, 0, 0.1) 3px
+  );
+}
+
+#token-percentage {
+  color: #888;
+  font-size: 9px;
+  min-width: 35px;
+  text-align: right;
+}
+
+#token-percentage.active {
+  color: #fff;
+}
+
+/* Countdown */
+#countdown-wrapper {
+  width: 100%;
+  text-align: center;
+}
+
+#countdown-text {
+  color: #888;
+  font-size: 9px;
+  transition: color 0.3s ease;
+}
+
+#countdown-text.urgent {
+  color: #ff3333;
+  animation: pulse-text 1s ease-in-out infinite;
+}
+
+#countdown-text.error {
+  color: #ff3333;
+}
+
+#countdown-text.demo {
+  color: #ffcc00;
+}
+
+/* CRT Scanline Effect */
+.scanlines {
+  pointer-events: none;
+  opacity: 0.05;
+  z-index: 100;
+}
+
+/* Animations */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes vibrate {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(0.5px, -0.5px); }
+  50% { transform: translate(-0.5px, 0.5px); }
+  75% { transform: translate(0.5px, 0.5px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes blink {
+  0%, 95%, 100% { opacity: 1; }
+  97% { opacity: 0.3; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes pulse-text {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes indicator-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Active state glow effect */
+.state-active #robot-container::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 150%;
+  height: 150%;
+  background: radial-gradient(circle, rgba(57, 255, 20, 0.1) 0%, transparent 70%);
+  pointer-events: none;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Dragging styles */
+body.dragging {
+  cursor: grabbing !important;
+}
+
+body.dragging #widget-container {
+  opacity: 0.8;
+}
+
+/* Error states */
+.error-state #token-percentage,
+.error-state #countdown-text {
+  color: #666;
+}
+
+/* Demo mode indicator */
+.demo-mode::after {
+  content: ' (demo)';
+  color: #666;
+  font-size: 8px;
+}
