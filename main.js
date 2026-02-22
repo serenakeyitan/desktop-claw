@@ -6,9 +6,7 @@ const UsagePoller = require('./usage-poller');
 const ProxyServer = require('./proxy');
 const LogWatcher = require('./watcher');
 const AuthManager = require('./auth-manager');
-const OpenAISubscriptionAuth = require('./openai-subscription-auth');
 const UsageTracker = require('./usage-tracker');
-const OpenAIUsageFetcher = require('./openai-usage-fetcher');
 const AutoUsageUpdater = require('./auto-usage-updater');
 
 // Configuration
@@ -18,12 +16,10 @@ const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 let mainWindow;
 let setupWindow;
 let authManager;
-let openaiAuth;
 let usagePoller;
 let proxyServer;
 let logWatcher;
 let usageTracker;
-let openaiUsageFetcher;
 let autoUsageUpdater;
 let currentState = 'idle';
 let lastActivityTime = Date.now();
@@ -71,9 +67,24 @@ function saveConfig(config) {
 // Check if authentication is available
 function hasAuth() {
   const config = loadConfig();
-  // Check for OpenAI subscription auth
-  if (config.authType === 'openai-subscription') {
-    return true; // Will check actual session state later
+  // Check for Claude OAuth (via keychain - automatic)
+  if (config.authType === 'claude-oauth' || config.authType === 'claude-status') {
+    return true;
+  }
+  // Check if Claude Code credentials exist in keychain (auto-detect)
+  try {
+    const { execSync } = require('child_process');
+    const user = require('os').userInfo().username;
+    execSync(
+      `security find-generic-password -a "${user}" -s "Claude Code-credentials" > /dev/null 2>&1`,
+      { timeout: 3000 }
+    );
+    // Claude Code is logged in - use it automatically
+    config.authType = 'claude-oauth';
+    saveConfig(config);
+    return true;
+  } catch {
+    // No Claude Code credentials
   }
   return false;
 }
@@ -282,67 +293,13 @@ async function initializeServices() {
     }, 30000); // Check every 30 seconds
   }
 
-  let authMethod = null;
-
-  // Check for OpenAI subscription auth
-  if (config.authType === 'openai-subscription') {
-    if (!openaiAuth) {
-      openaiAuth = new OpenAISubscriptionAuth();
-    }
-
-    // Load saved session
-    const hasSession = openaiAuth.loadSavedSession();
-    if (hasSession) {
-      authMethod = 'openai-subscription';
-      console.log('Using OpenAI ChatGPT Plus subscription tracking');
-
-      // Initialize usage tracking
-      openaiAuth.initializeUsageTracking();
-
-      // Send initial usage data
-      const sendUsageUpdate = () => {
-        const usage = openaiAuth.getUsageData();
-        if (mainWindow) {
-          mainWindow.webContents.send('token-update', {
-            used: usage.used,
-            limit: usage.limit,
-            pct: usage.percentage,
-            reset_at: usage.resetAt,
-            subscription: usage.subscription,
-            type: usage.type,
-            model: usage.model,
-            realData: false,
-            source: 'ChatGPT Plus tracking'
-          });
-        }
-      };
-
-      // Listen for usage updates
-      openaiAuth.on('usage-updated', sendUsageUpdate);
-
-      // Send initial data
-      sendUsageUpdate();
-
-      // Update every 30 seconds
-      setInterval(() => {
-        sendUsageUpdate();
-      }, 30000);
-
-      return;
-    } else {
-      console.log('No OpenAI session found, need to login');
-      // Will prompt for login via setup window
-    }
-
-  } else {
-    // Fall back to API key authentication
+  // Fall back to API key authentication if Claude OAuth is not active
+  if (config.authType !== 'claude-oauth' && config.authType !== 'claude-status') {
     authManager = new AuthManager();
     const authenticated = await authManager.initialize();
 
     if (!authenticated) {
-      // No authentication available - show error or demo mode
       if (process.env.ANTHROPIC_API_KEY === 'demo') {
-        // Demo mode
         authManager = null;
       } else {
         mainWindow.webContents.send('token-update', {
@@ -457,79 +414,83 @@ ipcMain.handle('open-config', () => {
   shell.openPath(CONFIG_FILE);
 });
 
-ipcMain.handle('set-env-api-key', (event, apiKey) => {
-  process.env.OPENAI_API_KEY = apiKey;
+ipcMain.handle('quit-app', () => {
+  app.quit();
+});
+
+// Setup flow: check if Claude Code CLI is installed
+ipcMain.handle('check-claude-installed', () => {
+  try {
+    const { execSync } = require('child_process');
+    const claudePath = execSync('which claude', { encoding: 'utf8', timeout: 3000 }).trim();
+    const version = execSync('claude --version 2>/dev/null || echo unknown', { encoding: 'utf8', timeout: 5000 }).trim();
+    return { installed: true, path: claudePath, version };
+  } catch {
+    return { installed: false, path: null, version: null };
+  }
+});
+
+// Setup flow: check if Claude Code has credentials in keychain
+ipcMain.handle('check-claude-credentials', () => {
+  try {
+    const { execSync } = require('child_process');
+    const user = os.userInfo().username;
+    const raw = execSync(
+      `security find-generic-password -a "${user}" -w -s "Claude Code-credentials"`,
+      { encoding: 'utf8', timeout: 5000 }
+    ).trim();
+    const creds = JSON.parse(raw);
+    if (creds.claudeAiOauth) {
+      return {
+        found: true,
+        subscriptionType: creds.claudeAiOauth.subscriptionType || 'pro',
+        hasRefreshToken: !!creds.claudeAiOauth.refreshToken,
+      };
+    }
+    return { found: false };
+  } catch {
+    return { found: false };
+  }
+});
+
+// Setup flow: test the API connection by fetching usage once
+ipcMain.handle('test-claude-connection', async () => {
+  try {
+    const ClaudeOAuthUsageTracker = require('./claude-oauth-usage-tracker');
+    const tracker = new ClaudeOAuthUsageTracker();
+    const result = await tracker.checkUsage();
+    tracker.stop();
+    if (result) {
+      return {
+        success: true,
+        usage: {
+          fiveHour: result.details?.five_hour?.utilization ?? null,
+          sevenDay: result.details?.seven_day?.utilization ?? null,
+          resetAt: result.resetAt,
+        }
+      };
+    }
+    return { success: false, error: 'No usage data returned' };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// Setup flow: save auth type and launch main window
+ipcMain.handle('complete-setup', async (event, authType) => {
+  const config = loadConfig();
+  config.authType = authType;
+  saveConfig(config);
+
   if (setupWindow) {
     setupWindow.close();
   }
-  return true;
-});
 
-ipcMain.handle('set-openai-token', async (event, tokenData) => {
-  try {
-    // Save token to config
-    const config = loadConfig();
-    config.openaiToken = tokenData;
-    config.authType = 'openai-oauth';
-    saveConfig(config);
-
-    // Restart services with new authentication if main window exists
-    if (mainWindow) {
-      cleanupServices();
-      await initializeServices();
-    }
-
-    if (setupWindow) {
-      setupWindow.close();
-    }
-
-    return { success: true };
-  } catch (error) {
-    console.error('Failed to save OpenAI token:', error);
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('login-with-openai', async () => {
-  if (!openaiAuth) {
-    openaiAuth = new OpenAISubscriptionAuth();
+  if (!mainWindow) {
+    createMainWindow();
   }
 
-  try {
-    const success = await openaiAuth.startLoginFlow();
-    if (success) {
-      // Store auth type
-      const config = loadConfig();
-      config.authType = 'openai-subscription';
-      saveConfig(config);
-
-      if (setupWindow) {
-        setupWindow.close();
-      }
-
-      // Restart services with OpenAI subscription auth
-      if (mainWindow) {
-        cleanupServices();
-        await initializeServices();
-      }
-    }
-    return { success, method: 'openai-subscription' };
-  } catch (error) {
-    console.error('OpenAI login failed:', error);
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('track-openai-message', () => {
-  if (openaiAuth && openaiAuth.trackMessage) {
-    openaiAuth.trackMessage('gpt-4');
-    return true;
-  }
-  return false;
-});
-
-ipcMain.handle('quit-app', () => {
-  app.quit();
+  return { success: true };
 });
 
 ipcMain.handle('track-message', () => {
@@ -544,7 +505,7 @@ ipcMain.handle('track-message', () => {
 ipcMain.handle('show-context-menu', (event) => {
   const template = [
     {
-      label: '🔐 Change OpenAI Authentication',
+      label: '🔐 Change Authentication',
       click: () => {
         // Open setup wizard for re-login
         if (!setupWindow) {
@@ -627,8 +588,8 @@ ipcMain.handle('show-context-menu', (event) => {
             </style>
           </head>
           <body>
-            <h3>Update OpenAI Usage</h3>
-            <div class="info">Enter your current OpenAI usage percentage</div>
+            <h3>Update Usage</h3>
+            <div class="info">Enter your current usage percentage</div>
             <input type="number" id="usage" placeholder="Enter percentage (0-100)" min="0" max="100" autofocus>
             <div style="margin-top: 20px;">
               <button onclick="save()">Save</button>
@@ -657,7 +618,7 @@ ipcMain.handle('show-context-menu', (event) => {
                     used: percentage,
                     limit: 100,
                     resetAt: endOfMonth.toISOString(),
-                    subscription: 'OpenAI Plus',
+                    subscription: 'Claude',
                     type: 'monthly',
                     realData: true,
                     timestamp: new Date().toISOString(),

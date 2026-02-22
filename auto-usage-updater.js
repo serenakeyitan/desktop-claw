@@ -1,8 +1,7 @@
-const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const ClaudeExpectTracker = require('./claude-expect-tracker');
+const ClaudeOAuthUsageTracker = require('./claude-oauth-usage-tracker');
 
 class AutoUsageUpdater {
   constructor() {
@@ -11,23 +10,29 @@ class AutoUsageUpdater {
     this.claudeTracker = null;
   }
 
-  // Initialize with automatic Claude expect tracking
+  // Initialize with Claude OAuth usage tracking
   async init() {
-    console.log('Initializing automatic Claude Code expect-based usage tracking...');
+    console.log('Initializing Claude OAuth-based usage tracking...');
 
-    // Start the Claude expect auto-tracker
     if (!this.claudeTracker) {
-      this.claudeTracker = new ClaudeExpectTracker();
+      this.claudeTracker = new ClaudeOAuthUsageTracker();
 
       // Listen for usage updates
       this.claudeTracker.on('usage-updated', (data) => {
-        console.log(`Claude expect tracker updated: ${data.percentage}% | Source: ${data.source}`);
+        console.log(`Claude OAuth tracker updated: ${data.percentage}% (5h) | Source: ${data.source}`);
+        if (data.details?.seven_day) {
+          console.log(`  7-day usage: ${data.details.seven_day.utilization}%`);
+        }
+      });
+
+      this.claudeTracker.on('error', (err) => {
+        console.error('Claude OAuth tracker error:', err.message);
       });
 
       // Start tracking
       const success = await this.claudeTracker.start();
       if (!success) {
-        console.error('Failed to start Claude expect tracker');
+        console.error('Failed to start Claude OAuth tracker');
         return false;
       }
     }
@@ -35,7 +40,7 @@ class AutoUsageUpdater {
     return true;
   }
 
-  // Get current usage from auto-tracker
+  // Get current usage from tracker
   async fetchUsage() {
     if (this.claudeTracker) {
       const data = this.claudeTracker.getUsageData();
@@ -56,18 +61,17 @@ class AutoUsageUpdater {
       console.log('Could not read usage file:', e.message);
     }
 
-    // No usage data available
     return null;
   }
 
   // Start automatic updates
   async start(intervalMinutes = 2) {
-    console.log('Starting automatic ChatGPT usage updater...');
+    console.log('Starting automatic Claude usage updater...');
 
     // Initialize the tracker
     await this.init();
 
-    // Set up periodic updates
+    // Set up periodic updates (the tracker itself also polls, this is a backup)
     this.updateInterval = setInterval(async () => {
       await this.update();
     }, intervalMinutes * 60 * 1000);
@@ -78,7 +82,7 @@ class AutoUsageUpdater {
     try {
       const usage = await this.fetchUsage();
       if (usage !== null) {
-        console.log(`ChatGPT usage: ${usage}%`);
+        console.log(`Claude usage: ${usage}%`);
         return true;
       }
     } catch (error) {

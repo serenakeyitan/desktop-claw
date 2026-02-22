@@ -5,18 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OpenClaw Setup</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
       font-size: 12px;
       background: #1a1a1a;
       color: #e0e0e0;
-      padding: 20px;
+      padding: 24px;
       display: flex;
       flex-direction: column;
       height: 100vh;
@@ -27,13 +23,13 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 16px;
     }
 
     h1 {
       font-size: 20px;
       color: #cd7f5d;
-      margin-bottom: 10px;
+      margin-bottom: 4px;
       display: flex;
       align-items: center;
       gap: 10px;
@@ -47,80 +43,104 @@
       mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="10" y="2" width="4" height="2"/><rect x="6" y="4" width="12" height="8"/><rect x="8" y="6" width="2" height="2" fill="white"/><rect x="14" y="6" width="2" height="2" fill="white"/><rect x="4" y="12" width="16" height="10"/><rect x="6" y="14" width="2" height="2"/></svg>') center/contain no-repeat;
     }
 
-    .description {
-      color: #888;
-      line-height: 1.5;
-    }
+    .description { color: #888; line-height: 1.5; }
 
-    .setup-steps {
+    .steps-container {
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 15px;
+      gap: 12px;
       overflow-y: auto;
-      padding-bottom: 20px;
+      padding-bottom: 12px;
     }
 
     .step {
       background: #2a2a2a;
-      padding: 15px;
-      border-left: 3px solid #cd7f5d;
+      padding: 14px 16px;
+      border-left: 3px solid #444;
+      transition: border-color 0.3s, opacity 0.3s;
     }
+
+    .step.active { border-left-color: #cd7f5d; }
+    .step.pass { border-left-color: #39ff14; }
+    .step.fail { border-left-color: #ff3333; }
+    .step.pending { opacity: 0.5; }
+
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .step-icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      flex-shrink: 0;
+      background: #444;
+      color: #888;
+    }
+
+    .step.active .step-icon { background: #cd7f5d; color: #1a1a1a; }
+    .step.pass .step-icon { background: #39ff14; color: #1a1a1a; }
+    .step.fail .step-icon { background: #ff3333; color: #fff; }
 
     .step-title {
-      color: #cd7f5d;
       font-weight: bold;
-      margin-bottom: 8px;
-    }
-
-    .input-group {
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-    }
-
-    label {
       color: #888;
+      font-size: 12px;
+    }
+
+    .step.active .step-title { color: #cd7f5d; }
+    .step.pass .step-title { color: #39ff14; }
+    .step.fail .step-title { color: #ff3333; }
+
+    .step-body {
+      margin-left: 30px;
       font-size: 11px;
+      color: #888;
+      line-height: 1.6;
     }
 
-    input[type="text"],
-    input[type="password"] {
-      background: #1a1a1a;
-      border: 1px solid #444;
-      color: #e0e0e0;
-      padding: 8px;
-      font-family: monospace;
-      font-size: 11px;
-    }
-
-    input:focus {
-      outline: none;
-      border-color: #cd7f5d;
-    }
-
-    .info-text {
-      color: #666;
-      font-size: 10px;
-      margin-top: 5px;
-    }
+    .step-body .detail { color: #666; margin-top: 4px; }
+    .step-body .success-detail { color: #39ff14; margin-top: 4px; }
+    .step-body .error-detail { color: #ff3333; margin-top: 4px; }
 
     .code-block {
       background: #0a0a0a;
-      padding: 8px;
+      padding: 8px 10px;
       border: 1px solid #333;
       color: #39ff14;
-      font-size: 10px;
+      font-size: 11px;
       user-select: text;
       cursor: text;
-      margin: 5px 0;
+      margin: 8px 0 4px;
+      display: inline-block;
     }
+
+    .spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid #444;
+      border-top-color: #cd7f5d;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     .buttons {
       display: flex;
       gap: 10px;
-      justify-content: flex-end;
-      padding-top: 10px;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 12px;
       border-top: 1px solid #333;
     }
 
@@ -128,59 +148,53 @@
       background: #cd7f5d;
       border: none;
       color: #1a1a1a;
-      padding: 8px 16px;
+      padding: 10px 20px;
       font-family: monospace;
-      font-size: 11px;
+      font-size: 12px;
+      font-weight: bold;
       cursor: pointer;
       transition: background 0.2s;
     }
 
-    button:hover {
-      background: #e69875;
-    }
-
-    button:active {
-      background: #a65d42;
-    }
-
-    button:disabled {
-      background: #444;
-      color: #666;
-      cursor: not-allowed;
-    }
+    button:hover { background: #e69875; }
+    button:active { background: #a65d42; }
+    button:disabled { background: #444; color: #666; cursor: not-allowed; }
 
     button.secondary {
+      background: transparent;
+      color: #666;
+      padding: 10px 12px;
+      font-weight: normal;
+    }
+
+    button.secondary:hover { color: #888; background: #2a2a2a; }
+
+    .retry-btn {
       background: #444;
-      color: #888;
+      color: #e0e0e0;
+      padding: 6px 12px;
+      font-size: 10px;
+      margin-top: 8px;
     }
 
-    button.secondary:hover {
-      background: #555;
+    .retry-btn:hover { background: #555; }
+
+    .usage-preview {
+      background: #1a1a1a;
+      padding: 10px 12px;
+      margin-top: 8px;
+      border: 1px solid #333;
     }
 
-    .status {
-      padding: 10px;
-      margin-top: 10px;
-      background: #2a2a2a;
-      border: 1px solid #444;
-      color: #888;
+    .usage-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 2px 0;
       font-size: 11px;
-      display: none;
     }
 
-    .status.error {
-      border-color: #ff3333;
-      color: #ff3333;
-    }
-
-    .status.success {
-      border-color: #39ff14;
-      color: #39ff14;
-    }
-
-    .status.visible {
-      display: block;
-    }
+    .usage-label { color: #888; }
+    .usage-value { color: #39ff14; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -191,103 +205,196 @@
     </h1>
 
     <div class="description">
-      Welcome! OpenClaw Pet tracks your ChatGPT Plus usage (GPT-4 message limits).
+      Track your Claude subscription usage with a desktop pet. Requires Claude Code CLI.
     </div>
 
-    <div class="setup-steps">
-      <div class="step">
-        <div class="step-title">Login with ChatGPT Plus Account</div>
-        <div class="info-text">
-          Track your GPT-4 message usage (80 messages per 3 hours)
+    <div class="steps-container">
+      <!-- Step 1: Check Claude Code installed -->
+      <div class="step pending" id="step-install">
+        <div class="step-header">
+          <div class="step-icon">1</div>
+          <div class="step-title">Claude Code CLI</div>
         </div>
-        <button id="openai-btn" onclick="loginWithOpenAI()" style="margin-top: 10px; background: #10a37f; width: 100%; padding: 12px;">
-          Login to ChatGPT
-        </button>
-        <div class="info-text" style="margin-top: 10px; color: #39ff14;">
-          ✓ Tracks GPT-4 message limits (80/3hr)<br>
-          ✓ 3-hour rolling window tracking<br>
-          ✓ Activity detection when ChatGPT is active<br>
-          ✓ Works with ChatGPT Plus subscriptions
-        </div>
-        <div class="info-text" style="margin-top: 10px; color: #ffa500;">
-          ⚠️ You'll need to login to ChatGPT in the popup window
+        <div class="step-body" id="step-install-body">
+          Checking if Claude Code is installed...
         </div>
       </div>
 
-      <div class="step">
-        <div class="step-title">How it Works</div>
-        <div class="info-text">
-          1. Click "Login to ChatGPT" above<br>
-          2. Sign in with your OpenAI account<br>
-          3. The pet will track your GPT-4 usage locally<br>
-          4. See your usage percentage and reset timer
+      <!-- Step 2: Check credentials -->
+      <div class="step pending" id="step-creds">
+        <div class="step-header">
+          <div class="step-icon">2</div>
+          <div class="step-title">Account Credentials</div>
         </div>
-        <div class="info-text" style="margin-top: 10px; color: #888;">
-          Note: Usage is tracked locally based on detected activity. For exact usage, check ChatGPT directly.
+        <div class="step-body" id="step-creds-body">
+          Waiting...
         </div>
       </div>
 
-      <div class="step">
-        <div class="step-title">GPT-4 Limits</div>
-        <div class="info-text" style="color: #39ff14;">
-          ChatGPT Plus includes:<br>
-          • 80 messages every 3 hours with GPT-4<br>
-          • Unlimited GPT-3.5 messages<br>
-          • Priority access during peak times
+      <!-- Step 3: Test API connection -->
+      <div class="step pending" id="step-api">
+        <div class="step-header">
+          <div class="step-icon">3</div>
+          <div class="step-title">API Connection</div>
+        </div>
+        <div class="step-body" id="step-api-body">
+          Waiting...
         </div>
       </div>
     </div>
-
-    <div class="status" id="status"></div>
 
     <div class="buttons">
-      <button class="secondary" onclick="skipSetup()">Skip</button>
-      <button id="save-btn" onclick="saveApiKey()">Save & Launch</button>
+      <button class="secondary" onclick="skipSetup()">Skip (demo mode)</button>
+      <button id="launch-btn" onclick="launchApp()" disabled>Launch OpenClaw</button>
     </div>
   </div>
 
   <script>
-    async function loginWithOpenAI() {
-      const openaiBtn = document.getElementById('openai-btn');
-      const status = document.getElementById('status');
+    let setupPassed = false;
 
-      openaiBtn.disabled = true;
-      openaiBtn.textContent = 'Opening ChatGPT login...';
+    // Run the setup checks automatically on load
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(runSetup, 400);
+    });
 
-      try {
-        const result = await window.electronAPI.loginWithOpenAI();
+    async function runSetup() {
+      // Step 1: Check Claude Code installed
+      await checkInstall();
+    }
 
-        if (result.success) {
-          showStatus('Successfully connected to ChatGPT! Tracking GPT-4 usage...', 'success');
-          setTimeout(() => {
-            window.close();
-          }, 1500);
-        } else {
-          showStatus(result.error || 'Login failed. Please try again.', 'error');
-          openaiBtn.disabled = false;
-          openaiBtn.textContent = 'Login to ChatGPT';
+    // ── Step 1: Claude Code CLI ──
+    async function checkInstall() {
+      const step = document.getElementById('step-install');
+      const body = document.getElementById('step-install-body');
+
+      step.className = 'step active';
+      body.innerHTML = '<span class="spinner"></span> Checking for Claude Code CLI...';
+
+      const result = await window.electronAPI.checkClaudeInstalled();
+
+      if (result.installed) {
+        step.className = 'step pass';
+        body.innerHTML = `Installed at <code>${result.path}</code>` +
+          `<div class="success-detail">Version: ${result.version}</div>`;
+        // Proceed to step 2
+        await checkCredentials();
+      } else {
+        step.className = 'step fail';
+        body.innerHTML =
+          'Claude Code CLI is not installed.' +
+          '<div class="detail" style="margin-top: 8px;">Install it with:</div>' +
+          '<div class="code-block">npm install -g @anthropic-ai/claude-code</div>' +
+          '<div class="detail">Then log in:</div>' +
+          '<div class="code-block">claude login</div>' +
+          '<button class="retry-btn" onclick="runSetup()">Retry Detection</button>';
+      }
+    }
+
+    // ── Step 2: Account Credentials ──
+    async function checkCredentials() {
+      const step = document.getElementById('step-creds');
+      const body = document.getElementById('step-creds-body');
+
+      step.className = 'step active';
+      body.innerHTML = '<span class="spinner"></span> Checking for Claude account credentials in Keychain...';
+
+      const result = await window.electronAPI.checkClaudeCredentials();
+
+      if (result.found) {
+        const planName = result.subscriptionType === 'max' ? 'Claude Max' :
+                         result.subscriptionType === 'pro' ? 'Claude Pro' :
+                         result.subscriptionType.charAt(0).toUpperCase() + result.subscriptionType.slice(1);
+        step.className = 'step pass';
+        body.innerHTML =
+          `Found <strong>${planName}</strong> subscription credentials.` +
+          `<div class="success-detail">OAuth refresh token: available</div>`;
+        // Proceed to step 3
+        await testConnection();
+      } else {
+        step.className = 'step fail';
+        body.innerHTML =
+          'No Claude credentials found in the macOS Keychain.' +
+          '<div class="detail" style="margin-top: 8px;">Log in to Claude Code first:</div>' +
+          '<div class="code-block">claude login</div>' +
+          '<div class="detail">This stores your OAuth credentials securely in the macOS Keychain.</div>' +
+          '<button class="retry-btn" onclick="retryFromStep2()">Retry</button>';
+      }
+    }
+
+    // ── Step 3: Test API ──
+    async function testConnection() {
+      const step = document.getElementById('step-api');
+      const body = document.getElementById('step-api-body');
+
+      step.className = 'step active';
+      body.innerHTML = '<span class="spinner"></span> Testing connection to Claude API...';
+
+      const result = await window.electronAPI.testClaudeConnection();
+
+      if (result.success) {
+        step.className = 'step pass';
+
+        let usageHtml = '<div class="usage-preview">';
+        if (result.usage.fiveHour !== null) {
+          usageHtml += `<div class="usage-row"><span class="usage-label">5-hour usage:</span><span class="usage-value">${Math.round(result.usage.fiveHour)}%</span></div>`;
         }
-      } catch (error) {
-        showStatus('Failed to start login', 'error');
-        openaiBtn.disabled = false;
-        openaiBtn.textContent = 'Login to ChatGPT';
+        if (result.usage.sevenDay !== null) {
+          usageHtml += `<div class="usage-row"><span class="usage-label">7-day usage:</span><span class="usage-value">${Math.round(result.usage.sevenDay)}%</span></div>`;
+        }
+        if (result.usage.resetAt) {
+          const resetDate = new Date(result.usage.resetAt);
+          const now = new Date();
+          const diffMs = resetDate - now;
+          const hours = Math.floor(diffMs / (1000 * 60 * 60));
+          const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+          usageHtml += `<div class="usage-row"><span class="usage-label">Resets in:</span><span class="usage-value">${hours}h ${mins}m</span></div>`;
+        }
+        usageHtml += '</div>';
+
+        body.innerHTML = 'Connected successfully! Live usage data:' + usageHtml;
+
+        // Enable launch button
+        setupPassed = true;
+        document.getElementById('launch-btn').disabled = false;
+      } else {
+        step.className = 'step fail';
+        body.innerHTML =
+          'Failed to connect to Claude API.' +
+          `<div class="error-detail">${result.error}</div>` +
+          '<div class="detail" style="margin-top: 8px;">This may be a temporary issue. Try again or check your internet connection.</div>' +
+          '<button class="retry-btn" onclick="retryFromStep3()">Retry</button>';
       }
     }
 
+    // ── Retry helpers ──
+    async function retryFromStep2() {
+      document.getElementById('step-creds').className = 'step pending';
+      document.getElementById('step-creds-body').textContent = 'Waiting...';
+      document.getElementById('step-api').className = 'step pending';
+      document.getElementById('step-api-body').textContent = 'Waiting...';
+      await checkCredentials();
+    }
+
+    async function retryFromStep3() {
+      document.getElementById('step-api').className = 'step pending';
+      document.getElementById('step-api-body').textContent = 'Waiting...';
+      await testConnection();
+    }
+
+    // ── Launch ──
+    async function launchApp() {
+      if (!setupPassed) return;
+      const btn = document.getElementById('launch-btn');
+      btn.disabled = true;
+      btn.textContent = 'Launching...';
+      await window.electronAPI.completeSetup('claude-oauth');
+    }
+
+    // ── Skip ──
     function skipSetup() {
-      if (confirm('OpenClaw Pet will run in demo mode. Continue?')) {
-        // Set demo mode
-        const config = { authType: 'demo' };
-        window.electronAPI.saveConfig(config).then(() => {
-          window.close();
-        });
+      if (confirm('OpenClaw will run in demo mode without real usage data. Continue?')) {
+        window.electronAPI.completeSetup('demo');
       }
-    }
-
-    function showStatus(message, type) {
-      const status = document.getElementById('status');
-      status.textContent = message;
-      status.className = `status visible ${type}`;
     }
   </script>
 </body>
