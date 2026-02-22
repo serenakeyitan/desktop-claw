@@ -191,54 +191,49 @@
     </h1>
 
     <div class="description">
-      Welcome! OpenClaw Pet needs your Anthropic API key to show token usage.
+      Welcome! OpenClaw Pet tracks your ChatGPT Plus usage (GPT-4 message limits).
     </div>
 
     <div class="setup-steps">
       <div class="step">
-        <div class="step-title">Option 1: Login with Claude Account (Recommended)</div>
+        <div class="step-title">Login with ChatGPT Plus Account</div>
         <div class="info-text">
-          Track your Claude subscription usage with local tracking
+          Track your GPT-4 message usage (80 messages per 3 hours)
         </div>
-        <button id="claude-btn" onclick="loginWithClaudeSubscription()" style="margin-top: 10px; background: #cd7f5d; width: 100%; padding: 12px;">
-          Login with Claude Account
+        <button id="openai-btn" onclick="loginWithOpenAI()" style="margin-top: 10px; background: #10a37f; width: 100%; padding: 12px;">
+          Login to ChatGPT
         </button>
         <div class="info-text" style="margin-top: 10px; color: #39ff14;">
-          ✓ Tracks your actual API calls locally<br>
-          ✓ Daily reset at midnight<br>
-          ✓ Activity detection when Claude is active<br>
-          ✓ Works with all Claude subscriptions
+          ✓ Tracks GPT-4 message limits (80/3hr)<br>
+          ✓ 3-hour rolling window tracking<br>
+          ✓ Activity detection when ChatGPT is active<br>
+          ✓ Works with ChatGPT Plus subscriptions
         </div>
-        <div class="info-text" style="margin-top: 10px; color: #888; font-size: 10px;">
-          Note: Due to API limitations, this tracks usage locally based on detected activity. For exact usage, check claude.ai directly.
-        </div>
-      </div>
-
-      <div class="step">
-        <div class="step-title">Option 2: Use API Key</div>
-        <div class="input-group">
-          <label for="api-key">Enter your Anthropic API key:</label>
-          <input type="password" id="api-key" placeholder="sk-ant-api03-..." />
-          <div class="info-text">For API-based token tracking (developers)</div>
+        <div class="info-text" style="margin-top: 10px; color: #ffa500;">
+          ⚠️ You'll need to login to ChatGPT in the popup window
         </div>
       </div>
 
       <div class="step">
-        <div class="step-title">Step 2: Configure Proxy (Optional)</div>
+        <div class="step-title">How it Works</div>
         <div class="info-text">
-          To detect Claude Code activity, configure it to use our proxy:
+          1. Click "Login to ChatGPT" above<br>
+          2. Sign in with your OpenAI account<br>
+          3. The pet will track your GPT-4 usage locally<br>
+          4. See your usage percentage and reset timer
         </div>
-        <div class="code-block">
-          export ANTHROPIC_API_BASE="http://localhost:9999"
+        <div class="info-text" style="margin-top: 10px; color: #888;">
+          Note: Usage is tracked locally based on detected activity. For exact usage, check ChatGPT directly.
         </div>
-        <div class="info-text">Add this to your ~/.zshrc or ~/.bashrc file</div>
       </div>
 
       <div class="step">
-        <div class="step-title">Step 3: Get Your API Key</div>
-        <div class="info-text">
-          Don't have an API key? Get one from:
-          <div class="code-block">https://console.anthropic.com/settings/keys</div>
+        <div class="step-title">GPT-4 Limits</div>
+        <div class="info-text" style="color: #39ff14;">
+          ChatGPT Plus includes:<br>
+          • 80 messages every 3 hours with GPT-4<br>
+          • Unlimited GPT-3.5 messages<br>
+          • Priority access during peak times
         </div>
       </div>
     </div>
@@ -252,101 +247,38 @@
   </div>
 
   <script>
-    async function saveClaudeToken() {
-      const claudeToken = document.getElementById('claude-token').value.trim();
-      const status = document.getElementById('status');
-      const tokenBtn = document.getElementById('claude-token-btn');
-
-      if (!claudeToken) {
-        showStatus('Please enter your Claude token', 'error');
-        return;
-      }
-
-      tokenBtn.disabled = true;
-      tokenBtn.textContent = 'Saving...';
-
-      try {
-        // Save the Claude token
-        const result = await window.electronAPI.setClaudeToken(claudeToken);
-
-        if (result.success) {
-          showStatus('Claude token saved! Launching OpenClaw Pet with real usage data...', 'success');
-          setTimeout(() => {
-            window.close();
-          }, 1500);
-        } else {
-          showStatus(result.error || 'Failed to save token', 'error');
-          tokenBtn.disabled = false;
-          tokenBtn.textContent = 'Use Claude Token';
-        }
-      } catch (error) {
-        showStatus('Failed to save token', 'error');
-        tokenBtn.disabled = false;
-        tokenBtn.textContent = 'Use Claude Token';
-      }
-    }
-
-    async function loginWithClaudeSubscription() {
-      const claudeBtn = document.getElementById('claude-btn');
+    async function loginWithOpenAI() {
+      const openaiBtn = document.getElementById('openai-btn');
       const status = document.getElementById('status');
 
-      claudeBtn.disabled = true;
-      claudeBtn.textContent = 'Opening Claude login...';
+      openaiBtn.disabled = true;
+      openaiBtn.textContent = 'Opening ChatGPT login...';
 
       try {
-        const result = await window.electronAPI.loginWithClaude();
+        const result = await window.electronAPI.loginWithOpenAI();
 
         if (result.success) {
-          showStatus('Successfully connected to your Claude account!', 'success');
+          showStatus('Successfully connected to ChatGPT! Tracking GPT-4 usage...', 'success');
           setTimeout(() => {
             window.close();
           }, 1500);
         } else {
           showStatus(result.error || 'Login failed. Please try again.', 'error');
-          claudeBtn.disabled = false;
-          claudeBtn.textContent = 'Login with Claude Account';
+          openaiBtn.disabled = false;
+          openaiBtn.textContent = 'Login to ChatGPT';
         }
       } catch (error) {
         showStatus('Failed to start login', 'error');
-        claudeBtn.disabled = false;
-        claudeBtn.textContent = 'Login with Claude Account';
+        openaiBtn.disabled = false;
+        openaiBtn.textContent = 'Login to ChatGPT';
       }
-    }
-
-    function saveApiKey() {
-      const apiKey = document.getElementById('api-key').value.trim();
-      const status = document.getElementById('status');
-      const saveBtn = document.getElementById('save-btn');
-
-      if (!apiKey) {
-        showStatus('Please enter your API key', 'error');
-        return;
-      }
-
-      if (!apiKey.startsWith('sk-ant-')) {
-        showStatus('Invalid API key format (should start with sk-ant-)', 'error');
-        return;
-      }
-
-      saveBtn.disabled = true;
-      saveBtn.textContent = 'Saving...';
-
-      // Set the API key as environment variable
-      window.electronAPI.setEnvApiKey(apiKey).then(() => {
-        showStatus('API key saved! Launching OpenClaw Pet...', 'success');
-        setTimeout(() => {
-          window.close();
-        }, 1500);
-      }).catch((error) => {
-        showStatus('Failed to save API key', 'error');
-        saveBtn.disabled = false;
-        saveBtn.textContent = 'Save & Launch';
-      });
     }
 
     function skipSetup() {
-      if (confirm('OpenClaw Pet will run in demo mode without an API key. Continue?')) {
-        window.electronAPI.setEnvApiKey('demo').then(() => {
+      if (confirm('OpenClaw Pet will run in demo mode. Continue?')) {
+        // Set demo mode
+        const config = { authType: 'demo' };
+        window.electronAPI.saveConfig(config).then(() => {
           window.close();
         });
       }
@@ -357,16 +289,6 @@
       status.textContent = message;
       status.className = `status visible ${type}`;
     }
-
-    // Allow Enter key to save
-    document.getElementById('api-key').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        saveApiKey();
-      }
-    });
-
-    // Focus on input
-    document.getElementById('api-key').focus();
   </script>
 </body>
 </html>

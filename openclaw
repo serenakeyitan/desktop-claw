@@ -1,0 +1,121 @@
+#!/usr/bin/env node
+
+const { spawn } = require('child_process');
+const path = require('path');
+const fs = require('fs');
+
+// Command mapping
+const commands = {
+  'setup-token': 'cli-setup.js',
+  'setup': 'cli-setup.js',
+  'test': 'test-openai-integration.js',
+  'start': 'npm start',
+  'run': 'npm start'
+};
+
+const colors = {
+  reset: '\x1b[0m',
+  bright: '\x1b[1m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  cyan: '\x1b[36m',
+  red: '\x1b[31m'
+};
+
+function print(message, color = '') {
+  console.log(color + message + colors.reset);
+}
+
+function printHelp() {
+  print('\n🤖 OpenClaw Pet - OpenAI Usage Tracker\n', colors.bright + colors.cyan);
+  print('Usage: openclaw <command> [options]\n', colors.bright);
+
+  print('Commands:', colors.yellow);
+  print('  setup-token        Configure OpenAI authentication', colors.cyan);
+  print('  setup              Alias for setup-token', colors.cyan);
+  print('  test               Test OpenAI integration', colors.cyan);
+  print('  start              Start the desktop pet app', colors.cyan);
+  print('  run                Alias for start', colors.cyan);
+  print('  help               Show this help message\n', colors.cyan);
+
+  print('Setup Options:', colors.yellow);
+  print('  openclaw setup-token                Interactive setup', colors.cyan);
+  print('  openclaw setup-token --api-key <key>  Set API key directly', colors.cyan);
+  print('  openclaw setup-token --oauth          Configure OAuth', colors.cyan);
+  print('  openclaw setup-token --test           Test authentication', colors.cyan);
+  print('  openclaw setup-token --clear          Clear saved credentials\n', colors.cyan);
+
+  print('Examples:', colors.yellow);
+  print('  openclaw setup-token                  # Interactive setup', colors.green);
+  print('  openclaw setup-token --api-key sk-... # Quick API key setup', colors.green);
+  print('  openclaw test                          # Test integration', colors.green);
+  print('  openclaw start                         # Run the app\n', colors.green);
+}
+
+function runCommand(scriptFile, args = []) {
+  const scriptPath = path.join(__dirname, scriptFile);
+
+  if (!fs.existsSync(scriptPath)) {
+    print(`❌ Error: Script ${scriptFile} not found`, colors.red);
+    process.exit(1);
+  }
+
+  const child = spawn('node', [scriptPath, ...args], {
+    stdio: 'inherit',
+    env: { ...process.env }
+  });
+
+  child.on('error', (error) => {
+    print(`❌ Failed to run command: ${error.message}`, colors.red);
+    process.exit(1);
+  });
+
+  child.on('exit', (code) => {
+    process.exit(code || 0);
+  });
+}
+
+function runNpmCommand(command) {
+  const [npm, ...args] = command.split(' ');
+
+  const child = spawn(npm, args, {
+    stdio: 'inherit',
+    shell: true,
+    env: { ...process.env }
+  });
+
+  child.on('error', (error) => {
+    print(`❌ Failed to run command: ${error.message}`, colors.red);
+    process.exit(1);
+  });
+
+  child.on('exit', (code) => {
+    process.exit(code || 0);
+  });
+}
+
+// Main execution
+const args = process.argv.slice(2);
+
+if (args.length === 0 || args[0] === 'help' || args[0] === '--help' || args[0] === '-h') {
+  printHelp();
+  process.exit(0);
+}
+
+const command = args[0];
+const commandArgs = args.slice(1);
+
+if (commands[command]) {
+  const target = commands[command];
+
+  if (target.startsWith('npm')) {
+    runNpmCommand(target);
+  } else {
+    runCommand(target, commandArgs);
+  }
+} else {
+  print(`❌ Unknown command: ${command}`, colors.red);
+  print('Run "openclaw help" for available commands', colors.yellow);
+  process.exit(1);
+}

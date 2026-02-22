@@ -15,9 +15,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // App control
   quitApp: () => ipcRenderer.invoke('quit-app'),
   setEnvApiKey: (apiKey) => ipcRenderer.invoke('set-env-api-key', apiKey),
-  setClaudeToken: (token) => ipcRenderer.invoke('set-claude-token', token),
-  startOAuthLogin: () => ipcRenderer.invoke('start-oauth-login'),
-  loginWithClaude: () => ipcRenderer.invoke('login-with-claude'),
+  loginWithOpenAI: () => ipcRenderer.invoke('login-with-openai'),
+  trackOpenAIMessage: () => ipcRenderer.invoke('track-openai-message'),
 
   // Event listeners
   onTokenUpdate: (callback) => {

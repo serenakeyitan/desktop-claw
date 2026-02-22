@@ -4,6 +4,7 @@ const pty = require('node-pty');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { getClaudeBinaryPath } = require('./claude-path');
 
 class LiveUsageMonitor {
   constructor() {
@@ -11,6 +12,7 @@ class LiveUsageMonitor {
     this.ptyProcess = null;
     this.output = '';
     this.lastUsage = null;
+    this.claudeBinary = null;
   }
 
   // Clean ANSI codes from terminal output
@@ -25,9 +27,16 @@ class LiveUsageMonitor {
   async startSession() {
     return new Promise((resolve, reject) => {
       console.log('Starting live Claude Code session...');
+      let claudeBinary;
+      try {
+        claudeBinary = this.ensureClaudeBinary();
+      } catch (error) {
+        reject(error);
+        return;
+      }
 
       // Create a pseudo-terminal
-      this.ptyProcess = pty.spawn('claude', [], {
+      this.ptyProcess = pty.spawn(claudeBinary, [], {
         name: 'xterm-256color',
         cols: 120,
         rows: 40,
@@ -48,12 +57,23 @@ class LiveUsageMonitor {
         }
 
         // Check if we're at the prompt
-        if (!sessionReady && (
-          cleaned.includes('How can I help') ||
-          cleaned.includes('desktop_bot') ||
-          cleaned.includes('>') ||
-          cleaned.includes('Claude Code')
-        )) {
+        const promptPatterns = [
+          'How can I help',
+          'desktop_bot',
+          'Claude Code',
+          'Enter a prompt',
+          'What would you like',
+          'Ready to assist',
+          'Available commands',
+          'Type /help',
+          'Welcome to Claude'
+        ];
+
+        const hasPromptPattern = promptPatterns.some(pattern => cleaned.includes(pattern));
+        const hasPromptChar = cleaned.trim().endsWith('>') || cleaned.trim().endsWith('$') || cleaned.trim().endsWith('#');
+        const hasSubstantialOutput = cleaned.length > 100;
+
+        if (!sessionReady && (hasPromptPattern || hasPromptChar || hasSubstantialOutput)) {
           sessionReady = true;
           clearTimeout(timeout);
           console.log('Claude session ready!');
@@ -74,12 +94,20 @@ class LiveUsageMonitor {
       // Timeout if session doesn't start
       timeout = setTimeout(() => {
         if (!sessionReady) {
-          console.log('Session timeout - Claude may not be available');
+          console.log('Session timeout after 60 seconds - Claude may not be available');
           this.stop();
           reject(new Error('Failed to start Claude session'));
         }
-      }, 10000);
+      }, 60000);  // Increased from 10s to 60s for Claude initialization
     });
+  }
+
+  ensureClaudeBinary() {
+    if (!this.claudeBinary) {
+      this.claudeBinary = getClaudeBinaryPath();
+      console.log('Using Claude CLI binary:', this.claudeBinary);
+    }
+    return this.claudeBinary;
   }
 
   // Parse usage from output

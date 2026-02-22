@@ -6,7 +6,12 @@
   "scripts": {
     "start": "electron .",
     "dev": "ELECTRON_IS_DEV=1 electron .",
-    "test": "echo \"No tests configured\""
+    "test": "node test-openai-integration.js",
+    "setup": "node cli-setup.js",
+    "setup-token": "node cli-setup.js"
+  },
+  "bin": {
+    "openclaw": "./openclaw"
   },
   "author": "OpenClaw",
   "license": "MIT",

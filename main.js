@@ -6,9 +6,9 @@ const UsagePoller = require('./usage-poller');
 const ProxyServer = require('./proxy');
 const LogWatcher = require('./watcher');
 const AuthManager = require('./auth-manager');
-const ClaudeAuth = require('./claude-auth');
+const OpenAISubscriptionAuth = require('./openai-subscription-auth');
 const UsageTracker = require('./usage-tracker');
-const ClaudeUsageFetcher = require('./claude-usage-fetcher');
+const OpenAIUsageFetcher = require('./openai-usage-fetcher');
 const AutoUsageUpdater = require('./auto-usage-updater');
 
 // Configuration
@@ -18,12 +18,12 @@ const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 let mainWindow;
 let setupWindow;
 let authManager;
-let claudeAuth;
+let openaiAuth;
 let usagePoller;
 let proxyServer;
 let logWatcher;
 let usageTracker;
-let claudeUsageFetcher;
+let openaiUsageFetcher;
 let autoUsageUpdater;
 let currentState = 'idle';
 let lastActivityTime = Date.now();
@@ -71,16 +71,11 @@ function saveConfig(config) {
 // Check if authentication is available
 function hasAuth() {
   const config = loadConfig();
-  // Check for Claude token first (best option for real usage)
-  if (config.authType === 'claude-token' && config.claudeToken) {
-    return true;
+  // Check for OpenAI subscription auth
+  if (config.authType === 'openai-subscription') {
+    return true; // Will check actual session state later
   }
-  // Check for Claude subscription auth
-  if (config.authType === 'claude-subscription') {
-    return true; // Will check actual auth state later
-  }
-  // Check for API key
-  return !!process.env.ANTHROPIC_API_KEY;
+  return false;
 }
 
 // Create setup wizard window
@@ -186,17 +181,57 @@ function createMainWindow() {
 }
 
 // Check for manual usage file
+// Normalize usage blobs saved by scripts so the renderer always gets pct/reset_at
+function normalizeUsageData(data, defaultSource = 'manual-file') {
+  if (!data || typeof data !== 'object') {
+    return null;
+  }
+
+  const limit = Number.isFinite(data.limit) ? data.limit : 100;
+  let pct = Number.isFinite(data.pct) ? data.pct : undefined;
+
+  if (pct === undefined && Number.isFinite(data.percentage)) {
+    pct = data.percentage;
+  }
+  if (pct === undefined && Number.isFinite(data.used) && limit > 0) {
+    pct = Math.round((data.used / limit) * 100);
+  }
+  if (!Number.isFinite(pct)) {
+    pct = 0;
+  }
+
+  pct = Math.max(0, Math.min(100, pct));
+  const used = Number.isFinite(data.used) ? data.used : Math.round((pct / 100) * limit);
+  const resetAt = data.reset_at || data.resetAt || null;
+
+  return {
+    used,
+    limit,
+    pct,
+    percentage: pct,
+    reset_at: resetAt,
+    resetAt,
+    subscription: data.subscription || 'Claude Pro',
+    type: data.type || '5-hour',
+    realData: data.realData !== undefined ? data.realData : true,
+    source: data.source || defaultSource,
+    timestamp: data.timestamp || new Date().toISOString()
+  };
+}
+
 function checkManualUsageFile() {
   const manualUsageFile = path.join(os.homedir(), '.openclaw-pet', 'real-usage.json');
   try {
     if (fs.existsSync(manualUsageFile)) {
       const data = JSON.parse(fs.readFileSync(manualUsageFile, 'utf8'));
-      // Check if data is not too old (within 6 hours)
-      const timestamp = new Date(data.timestamp);
+      const timestamp = data.timestamp ? new Date(data.timestamp) : new Date(0);
       const age = Date.now() - timestamp.getTime();
       if (age < 6 * 60 * 60 * 1000) {
-        console.log('Found recent manual usage data:', data);
-        return data;
+        const normalized = normalizeUsageData(data, data.source || 'manual-file');
+        if (normalized) {
+          console.log('Found recent manual usage data:', normalized);
+          return normalized;
+        }
       }
     }
   } catch (error) {
@@ -209,13 +244,27 @@ function checkManualUsageFile() {
 async function initializeServices() {
   const config = loadConfig();
 
-  // Start automatic usage updater
-  try {
+  // Start the AutoUsageUpdater for Claude /status tracking
+  if (!autoUsageUpdater) {
     autoUsageUpdater = new AutoUsageUpdater();
-    await autoUsageUpdater.start(2); // Update every 2 minutes
-    console.log('Auto usage updater started');
-  } catch (error) {
-    console.log('Auto updater not available:', error.message);
+
+    try {
+      await autoUsageUpdater.init();
+      console.log('Started automatic Claude /status usage tracking');
+
+      // Start automatic updates
+      autoUsageUpdater.start(1); // Check every minute
+
+      // Listen for updates
+      autoUsageUpdater.claudeTracker.on('usage-updated', (data) => {
+        if (mainWindow) {
+          const normalized = normalizeUsageData(data, 'claude-status');
+          mainWindow.webContents.send('token-update', normalized);
+        }
+      });
+    } catch (error) {
+      console.error('Failed to start auto usage updater:', error);
+    }
   }
 
   // Check for manual usage data
@@ -232,111 +281,27 @@ async function initializeServices() {
       }
     }, 30000); // Check every 30 seconds
   }
+
   let authMethod = null;
 
-  // Check for Claude token first (highest priority)
-  if (config.authType === 'claude-token' && config.claudeToken) {
-    if (!claudeAuth) {
-      claudeAuth = new ClaudeAuth();
+  // Check for OpenAI subscription auth
+  if (config.authType === 'openai-subscription') {
+    if (!openaiAuth) {
+      openaiAuth = new OpenAISubscriptionAuth();
     }
 
-    // Set the token for API access
-    claudeAuth.oauthToken = config.claudeToken;
-    authMethod = 'claude-token';
-    console.log('Using Claude OAuth token for real usage data');
-  }
-  // Initialize Claude auth if needed
-  else if (config.authType === 'claude-subscription') {
-    if (!claudeAuth) {
-      claudeAuth = new ClaudeAuth();
-    }
+    // Load saved session
+    const hasSession = openaiAuth.loadSavedSession();
+    if (hasSession) {
+      authMethod = 'openai-subscription';
+      console.log('Using OpenAI ChatGPT Plus subscription tracking');
 
-    // Try to capture existing session
-    try {
-      const hasSession = await claudeAuth.captureSessionFromBrowser();
-      if (hasSession) {
-        authMethod = 'claude-subscription';
-        console.log('Using Claude subscription authentication');
-      }
-    } catch (error) {
-      console.error('Failed to capture Claude session:', error);
-    }
-  }
-
-  // Check for Claude token or subscription auth first
-  if (authMethod === 'claude-token' || authMethod === 'claude-subscription') {
-    // First, try to use ClaudeUsageFetcher to get real usage from Claude Code
-    try {
-      console.log('Starting Claude usage fetcher for real data...');
-      claudeUsageFetcher = new ClaudeUsageFetcher();
-
-      // Listen for usage updates from Claude
-      claudeUsageFetcher.on('usage-updated', (usageData) => {
-        console.log('Got real usage data from Claude Code!');
-        const primaryUsage = claudeUsageFetcher.getPrimaryUsage();
-        if (primaryUsage && mainWindow) {
-          mainWindow.webContents.send('token-update', {
-            used: primaryUsage.used,
-            limit: primaryUsage.limit,
-            pct: primaryUsage.percentage,
-            reset_at: primaryUsage.resetAt,
-            subscription: primaryUsage.subscription,
-            type: primaryUsage.type,
-            realData: true,
-            source: 'Claude Code /usage command'
-          });
-        }
-      });
-
-      // Start the fetcher with periodic checks every 5 minutes
-      await claudeUsageFetcher.start();
-      claudeUsageFetcher.startPeriodicCheck(5);
-      console.log('Claude usage fetcher started successfully');
-
-      // We have real usage, so return early
-      return;
-    } catch (error) {
-      console.log('Could not start Claude usage fetcher, trying API method:', error.message);
-    }
-
-    // Fallback to API fetch method (which we know doesn't work, but keep as backup)
-    const fetchRealUsage = async () => {
-      try {
-        const apiUsage = await claudeAuth.fetchFromAPI();
-        if (apiUsage && !apiUsage.error) {
-          console.log('Using real API usage data:', apiUsage);
-          if (mainWindow) {
-            mainWindow.webContents.send('token-update', {
-              used: apiUsage.used,
-              limit: apiUsage.limit,
-              pct: apiUsage.percentage || apiUsage.used, // OAuth returns percentage as used
-              reset_at: apiUsage.resetAt,
-              subscription: apiUsage.subscription,
-              type: 'messages',
-              realData: true,
-              weeklyUsed: apiUsage.weeklyUsed,
-              weeklyResetAt: apiUsage.weeklyResetAt,
-              source: apiUsage.source
-            });
-          }
-          return true;
-        }
-      } catch (error) {
-        console.log('Could not fetch real usage, falling back to local tracking');
-      }
-      return false;
-    };
-
-    // Try to get real usage first
-    const hasRealUsage = await fetchRealUsage();
-
-    if (!hasRealUsage) {
-      // Fall back to local tracking if API doesn't work
-      usageTracker = new UsageTracker();
+      // Initialize usage tracking
+      openaiAuth.initializeUsageTracking();
 
       // Send initial usage data
       const sendUsageUpdate = () => {
-        const usage = usageTracker.getUsageData();
+        const usage = openaiAuth.getUsageData();
         if (mainWindow) {
           mainWindow.webContents.send('token-update', {
             used: usage.used,
@@ -344,39 +309,30 @@ async function initializeServices() {
             pct: usage.percentage,
             reset_at: usage.resetAt,
             subscription: usage.subscription,
-            type: 'messages',
-            realTracking: true,
-            remaining: usage.remaining
+            type: usage.type,
+            model: usage.model,
+            realData: false,
+            source: 'ChatGPT Plus tracking'
           });
         }
       };
 
       // Listen for usage updates
-      usageTracker.on('usage-updated', sendUsageUpdate);
+      openaiAuth.on('usage-updated', sendUsageUpdate);
 
       // Send initial data
       sendUsageUpdate();
-    }
 
-    // Update every 30 seconds to refresh
-    setInterval(async () => {
-      const gotReal = await fetchRealUsage();
-      if (!gotReal && usageTracker) {
-        const usage = usageTracker.getUsageData();
-        if (mainWindow) {
-          mainWindow.webContents.send('token-update', {
-            used: usage.used,
-            limit: usage.limit,
-            pct: usage.percentage,
-            reset_at: usage.resetAt,
-            subscription: usage.subscription,
-            type: 'messages',
-            realTracking: true,
-            remaining: usage.remaining
-          });
-        }
-      }
-    }, 30000);
+      // Update every 30 seconds
+      setInterval(() => {
+        sendUsageUpdate();
+      }, 30000);
+
+      return;
+    } else {
+      console.log('No OpenAI session found, need to login');
+      // Will prompt for login via setup window
+    }
 
   } else {
     // Fall back to API key authentication
@@ -446,6 +402,10 @@ async function initializeServices() {
 
 // Cleanup services
 function cleanupServices() {
+  if (autoUsageUpdater) {
+    autoUsageUpdater.stop();
+    autoUsageUpdater = null;
+  }
   if (usagePoller) {
     usagePoller.stop();
     usagePoller = null;
@@ -498,23 +458,20 @@ ipcMain.handle('open-config', () => {
 });
 
 ipcMain.handle('set-env-api-key', (event, apiKey) => {
-  process.env.ANTHROPIC_API_KEY = apiKey;
+  process.env.OPENAI_API_KEY = apiKey;
   if (setupWindow) {
     setupWindow.close();
   }
   return true;
 });
 
-ipcMain.handle('set-claude-token', async (event, token) => {
+ipcMain.handle('set-openai-token', async (event, tokenData) => {
   try {
     // Save token to config
     const config = loadConfig();
-    config.claudeToken = token;
-    config.authType = 'claude-token';
+    config.openaiToken = tokenData;
+    config.authType = 'openai-oauth';
     saveConfig(config);
-
-    // Set it as environment variable for easy access
-    process.env.CLAUDE_OAUTH_TOKEN = token;
 
     // Restart services with new authentication if main window exists
     if (mainWindow) {
@@ -528,55 +485,47 @@ ipcMain.handle('set-claude-token', async (event, token) => {
 
     return { success: true };
   } catch (error) {
-    console.error('Failed to save Claude token:', error);
+    console.error('Failed to save OpenAI token:', error);
     return { success: false, error: error.message };
   }
 });
 
-ipcMain.handle('start-oauth-login', async () => {
-  if (!authManager) {
-    authManager = new AuthManager();
+ipcMain.handle('login-with-openai', async () => {
+  if (!openaiAuth) {
+    openaiAuth = new OpenAISubscriptionAuth();
   }
 
   try {
-    const success = await authManager.startOAuthFlow();
-    if (success && setupWindow) {
-      setupWindow.close();
-    }
-    return { success, method: 'oauth' };
-  } catch (error) {
-    console.error('OAuth login failed:', error);
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('login-with-claude', async () => {
-  if (!claudeAuth) {
-    claudeAuth = new ClaudeAuth();
-  }
-
-  try {
-    const success = await claudeAuth.startLoginFlow();
+    const success = await openaiAuth.startLoginFlow();
     if (success) {
       // Store auth type
       const config = loadConfig();
-      config.authType = 'claude-subscription';
+      config.authType = 'openai-subscription';
       saveConfig(config);
 
       if (setupWindow) {
         setupWindow.close();
       }
 
-      // Restart services with Claude auth
+      // Restart services with OpenAI subscription auth
       if (mainWindow) {
-        initializeServices();
+        cleanupServices();
+        await initializeServices();
       }
     }
-    return { success, method: 'claude-subscription' };
+    return { success, method: 'openai-subscription' };
   } catch (error) {
-    console.error('Claude login failed:', error);
+    console.error('OpenAI login failed:', error);
     return { success: false, error: error.message };
   }
+});
+
+ipcMain.handle('track-openai-message', () => {
+  if (openaiAuth && openaiAuth.trackMessage) {
+    openaiAuth.trackMessage('gpt-4');
+    return true;
+  }
+  return false;
 });
 
 ipcMain.handle('quit-app', () => {
@@ -595,7 +544,7 @@ ipcMain.handle('track-message', () => {
 ipcMain.handle('show-context-menu', (event) => {
   const template = [
     {
-      label: '🔐 Change Authentication',
+      label: '🔐 Change OpenAI Authentication',
       click: () => {
         // Open setup wizard for re-login
         if (!setupWindow) {
@@ -678,8 +627,8 @@ ipcMain.handle('show-context-menu', (event) => {
             </style>
           </head>
           <body>
-            <h3>Update Claude Usage</h3>
-            <div class="info">Run /usage in Claude Code to see your current usage</div>
+            <h3>Update OpenAI Usage</h3>
+            <div class="info">Enter your current OpenAI usage percentage</div>
             <input type="number" id="usage" placeholder="Enter percentage (0-100)" min="0" max="100" autofocus>
             <div style="margin-top: 20px;">
               <button onclick="save()">Save</button>
@@ -701,14 +650,15 @@ ipcMain.handle('show-context-menu', (event) => {
                     fs.mkdirSync(dir, { recursive: true });
                   }
 
-                  const resetAt = new Date(Date.now() + 5 * 60 * 60 * 1000);
+                  const now = new Date();
+                  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
                   const usageData = {
                     percentage: percentage,
                     used: percentage,
                     limit: 100,
-                    resetAt: resetAt.toISOString(),
-                    subscription: 'Claude Pro',
-                    type: '5-hour',
+                    resetAt: endOfMonth.toISOString(),
+                    subscription: 'OpenAI Plus',
+                    type: 'monthly',
                     realData: true,
                     timestamp: new Date().toISOString(),
                     source: 'manual-menu'
