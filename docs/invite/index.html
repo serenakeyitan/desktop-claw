@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenClaw — Friend Invite</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+      background: #0d0d0d;
+      color: #ccc;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 420px;
+      width: 90%;
+      padding: 32px;
+      text-align: center;
+    }
+
+    .logo {
+      font-size: 48px;
+      margin-bottom: 8px;
+    }
+
+    .title {
+      color: #cd7f5d;
+      font-size: 16px;
+      font-weight: bold;
+      letter-spacing: 3px;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      color: #555;
+      font-size: 10px;
+      letter-spacing: 1px;
+      margin-bottom: 32px;
+    }
+
+    /* Status messages */
+    #status-opening {
+      color: #39ff14;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      margin-bottom: 24px;
+    }
+
+    #status-opening .dots::after {
+      content: '';
+      animation: dots 1.5s steps(3, end) infinite;
+    }
+
+    @keyframes dots {
+      0%   { content: ''; }
+      33%  { content: '.'; }
+      66%  { content: '..'; }
+      100% { content: '...'; }
+    }
+
+    /* Invite code display */
+    .invite-code {
+      display: inline-block;
+      background: #1a1a1a;
+      border: 2px solid #cd7f5d;
+      color: #cd7f5d;
+      font-size: 20px;
+      font-weight: bold;
+      letter-spacing: 4px;
+      padding: 12px 24px;
+      margin-bottom: 24px;
+      user-select: all;
+    }
+
+    .invite-label {
+      color: #666;
+      font-size: 8px;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+    }
+
+    /* Sections */
+    .section {
+      margin-bottom: 24px;
+    }
+
+    .section-title {
+      color: #888;
+      font-size: 9px;
+      letter-spacing: 2px;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #222;
+    }
+
+    /* Open app button */
+    .open-btn {
+      display: inline-block;
+      background: #cd7f5d;
+      color: #0d0d0d;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      padding: 10px 28px;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      margin-bottom: 8px;
+    }
+
+    .open-btn:hover { background: #d9936f; }
+
+    .open-hint {
+      color: #444;
+      font-size: 9px;
+    }
+
+    /* Setup steps */
+    .steps {
+      text-align: left;
+      margin: 0 auto;
+      max-width: 340px;
+    }
+
+    .step {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 14px;
+      align-items: flex-start;
+    }
+
+    .step-num {
+      color: #cd7f5d;
+      font-size: 12px;
+      font-weight: bold;
+      flex-shrink: 0;
+      width: 18px;
+    }
+
+    .step-text {
+      font-size: 11px;
+      color: #aaa;
+      line-height: 1.5;
+    }
+
+    .step-text code {
+      display: block;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #39ff14;
+      font-size: 10px;
+      padding: 6px 10px;
+      margin-top: 6px;
+      user-select: all;
+      cursor: text;
+      word-break: break-all;
+    }
+
+    .step-text a {
+      color: #cd7f5d;
+      text-decoration: none;
+    }
+
+    .step-text a:hover {
+      text-decoration: underline;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #222;
+      margin: 24px 0;
+    }
+
+    /* Footer */
+    .footer {
+      color: #333;
+      font-size: 7px;
+      letter-spacing: 1px;
+      margin-top: 32px;
+    }
+
+    /* Hidden utility */
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">&#x1F980;</div>
+    <div class="title">OPENCLAW</div>
+    <div class="subtitle">CLAUDE USAGE TRACKER</div>
+
+    <!-- Phase 1: Trying to open the app -->
+    <div id="status-opening">
+      Opening OpenClaw<span class="dots"></span>
+    </div>
+
+    <!-- Phase 2: App not installed — show setup guide -->
+    <div id="setup-guide" class="hidden">
+
+      <div class="invite-label">YOUR FRIEND'S INVITE CODE</div>
+      <div class="invite-code" id="code-display">--------</div>
+
+      <div class="section">
+        <a id="open-app-link" href="#" class="open-btn">OPEN IN OPENCLAW</a>
+        <div class="open-hint">Already have the app installed?</div>
+      </div>
+
+      <hr class="divider" />
+
+      <div class="section">
+        <div class="section-title">SETUP INSTRUCTIONS</div>
+        <div class="steps">
+          <div class="step">
+            <span class="step-num">1</span>
+            <div class="step-text">
+              Clone the repository:
+              <code>git clone https://github.com/serenakeyitan/desktop-claw.git</code>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-num">2</span>
+            <div class="step-text">
+              Install dependencies:
+              <code>cd desktop-claw && npm install</code>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-num">3</span>
+            <div class="step-text">
+              Launch the app:
+              <code>npx electron .</code>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-num">4</span>
+            <div class="step-text">
+              Sign up in the app, then add your friend using this code:
+              <code id="code-copy">--------</code>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">OPENCLAW DESKTOP PET</div>
+  </div>
+
+  <script>
+    // Extract invite code from URL: ?code=ABCD1234
+    const params = new URLSearchParams(window.location.search);
+    const code = (params.get('code') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+
+    if (!code) {
+      document.getElementById('status-opening').textContent = 'No invite code found.';
+    } else {
+      // Display the code
+      document.getElementById('code-display').textContent = code;
+      document.getElementById('code-copy').textContent = code;
+
+      // Build the deep link
+      const deepLink = `openclaw://invite/${code}`;
+      document.getElementById('open-app-link').href = deepLink;
+
+      // Try to open the app via deep link
+      tryOpenApp(deepLink);
+    }
+
+    function tryOpenApp(deepLink) {
+      // Use an iframe to attempt the deep link silently.
+      // If the app is installed, it opens. If not, nothing happens visually.
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = deepLink;
+      document.body.appendChild(iframe);
+
+      // Also try window.location as a fallback (some browsers block iframe deep links)
+      setTimeout(() => {
+        window.location.href = deepLink;
+      }, 100);
+
+      // If we're still here after 2.5 seconds, the app probably isn't installed.
+      // Show the setup guide.
+      setTimeout(() => {
+        document.getElementById('status-opening').classList.add('hidden');
+        document.getElementById('setup-guide').classList.remove('hidden');
+      }, 2500);
+    }
+  </script>
+</body>
+</html>

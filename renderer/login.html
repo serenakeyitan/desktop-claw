@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenClaw — Login</title>
+  <link rel="stylesheet" href="login.css" />
+</head>
+<body>
+  <div id="container">
+    <!-- Header -->
+    <div id="header">
+      <div id="logo">🦀 OPENCLAW</div>
+      <div id="subtitle">Social Ranking</div>
+    </div>
+
+    <!-- Login Form (default view) -->
+    <div id="login-form" class="form-panel">
+      <h2>Sign In</h2>
+      <input type="email" id="login-email" placeholder="Email" autocomplete="email" />
+      <input type="password" id="login-password" placeholder="Password" autocomplete="current-password" />
+      <button id="login-btn" class="primary-btn">Sign In</button>
+      <div class="switch-text">
+        No account? <a href="#" id="show-signup">Create one</a>
+      </div>
+      <div id="login-error" class="error hidden"></div>
+    </div>
+
+    <!-- Sign-Up Form -->
+    <div id="signup-form" class="form-panel hidden">
+      <h2>Create Account</h2>
+      <input type="text" id="signup-username" placeholder="Username" autocomplete="username" />
+      <input type="email" id="signup-email" placeholder="Email" autocomplete="email" />
+      <input type="password" id="signup-password" placeholder="Password (min 6 chars)" autocomplete="new-password" />
+      <button id="signup-btn" class="primary-btn">Create Account</button>
+      <div class="switch-text">
+        Already have an account? <a href="#" id="show-login">Sign in</a>
+      </div>
+      <div id="signup-error" class="error hidden"></div>
+    </div>
+
+    <!-- Success panel (shown after signup) -->
+    <div id="success-panel" class="form-panel hidden">
+      <h2>Welcome!</h2>
+      <p id="welcome-msg">Your account has been created.</p>
+      <div id="invite-code-box">
+        <span id="invite-label">YOUR INVITE LINK</span>
+        <span id="invite-link" class="invite-link">Loading invite link...</span>
+        <button id="copy-invite" class="small-btn">Copy Link</button>
+      </div>
+      <p id="friend-added-msg" class="hint hidden"></p>
+      <p class="hint">Share this link with friends — they click it and you're automatically added as friends.</p>
+      <button id="continue-btn" class="primary-btn">Continue</button>
+    </div>
+  </div>
+
+  <script src="login.js"></script>
+</body>
+</html>

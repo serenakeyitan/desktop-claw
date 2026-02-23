@@ -9,6 +9,9 @@ const AuthManager = require('./auth-manager');
 const UsageTracker = require('./usage-tracker');
 const AutoUsageUpdater = require('./auto-usage-updater');
 const SessionMonitor = require('./session-monitor');
+const UsageDB = require('./usage-db');
+const supabaseClient = require('./supabase-client');
+const SocialSync = require('./social-sync');
 
 // Configuration
 const CONFIG_DIR = path.join(os.homedir(), '.openclaw-pet');
@@ -23,6 +26,13 @@ let logWatcher;
 let usageTracker;
 let autoUsageUpdater;
 let sessionMonitor;
+let usageDB;
+let rankingWindow;
+let loginWindow;
+let socialWindow;
+let socialSync;
+let lastUsagePct = null;  // tracks last OAuth utilization for delta computation
+let pendingInviteCode = null;  // queued invite code from deep link, processed after login
 let currentState = 'idle';
 let lastActivityTime = Date.now();
 let windowPosition = null;
@@ -257,6 +267,12 @@ function checkManualUsageFile() {
 async function initializeServices() {
   const config = loadConfig();
 
+  // Initialize usage history database
+  if (!usageDB) {
+    usageDB = new UsageDB();
+    console.log('Usage history database loaded');
+  }
+
   // Start the AutoUsageUpdater for Claude /status tracking
   if (!autoUsageUpdater) {
     autoUsageUpdater = new AutoUsageUpdater();
@@ -268,11 +284,45 @@ async function initializeServices() {
       // Start automatic updates
       autoUsageUpdater.start(1); // Check every minute
 
-      // Listen for updates
+      // Listen for updates — attribute usage deltas to busy sessions
       autoUsageUpdater.claudeTracker.on('usage-updated', (data) => {
         if (mainWindow) {
           const normalized = normalizeUsageData(data, 'claude-status');
           mainWindow.webContents.send('token-update', normalized);
+        }
+
+        // Sync subscription tier to Supabase profile
+        if (socialSync && data.subscriptionTier) {
+          socialSync.setSubscriptionTier(data.subscriptionTier);
+        }
+
+        // Attribution: compute delta and assign to busy sessions
+        if (usageDB && sessionMonitor) {
+          const currentPct = data.percentage ?? data.pct ?? null;
+          if (currentPct !== null && lastUsagePct !== null) {
+            const delta = currentPct - lastUsagePct;
+            if (delta > 0) {
+              // Get currently busy sessions
+              const sessions = sessionMonitor.getSessions();
+              const busySessions = sessions.filter(s => s.busy);
+
+              if (busySessions.length > 0) {
+                // Split delta equally among busy sessions
+                const perSession = delta / busySessions.length;
+                for (const s of busySessions) {
+                  const project = s.project || 'unknown';
+                  // Estimate active time as the full poll interval (60s)
+                  usageDB.recordUsage(project, perSession, 60000);
+                }
+                console.log(`Usage attributed: +${delta.toFixed(1)}% to ${busySessions.map(s => s.project).join(', ')}`);
+              } else {
+                // No busy sessions — attribute to "other" (web usage, etc.)
+                usageDB.recordUsage('(other)', delta, 0);
+                console.log(`Usage attributed: +${delta.toFixed(1)}% to (other) — no active sessions`);
+              }
+            }
+          }
+          lastUsagePct = data.percentage ?? data.pct ?? lastUsagePct;
         }
       });
     } catch (error) {
@@ -413,6 +463,17 @@ async function initializeServices() {
   } catch (error) {
     console.error('Failed to start session monitor:', error);
   }
+
+  // Try to restore a previous Supabase social session
+  try {
+    const restoredUser = await supabaseClient.restoreSession();
+    if (restoredUser) {
+      console.log('Supabase session restored for', restoredUser.email);
+      await startSocialSync();
+    }
+  } catch (error) {
+    console.log('No Supabase session to restore:', error.message);
+  }
 }
 
 // Cleanup services
@@ -436,6 +497,10 @@ function cleanupServices() {
   if (sessionMonitor) {
     sessionMonitor.stop();
     sessionMonitor = null;
+  }
+  if (socialSync) {
+    socialSync.stop();
+    socialSync = null;
   }
 }
 
@@ -563,6 +628,220 @@ ipcMain.handle('track-message', () => {
   return false;
 });
 
+// Ranking window
+function openRankingWindow() {
+  if (rankingWindow && !rankingWindow.isDestroyed()) {
+    rankingWindow.focus();
+    return;
+  }
+
+  rankingWindow = new BrowserWindow({
+    width: 420,
+    height: 500,
+    resizable: true,
+    minimizable: true,
+    maximizable: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload-ranking.js'),
+    },
+    backgroundColor: '#0d0d0d',
+    title: 'Usage Ranking',
+  });
+
+  rankingWindow.loadFile(path.join(__dirname, 'renderer', 'ranking.html'));
+
+  rankingWindow.on('closed', () => {
+    rankingWindow = null;
+  });
+}
+
+// IPC: fetch ranking data for the ranking window
+ipcMain.handle('get-ranking', (event, period) => {
+  if (!usageDB) usageDB = new UsageDB();
+  const ranking = usageDB.getRanking(period || 'all');
+  const total = usageDB.getTotalUsage(period || 'all');
+  return { ranking, total };
+});
+
+// ── Social: window launchers ─────────────────────────────────────────────
+
+function openLoginWindow() {
+  if (loginWindow && !loginWindow.isDestroyed()) {
+    loginWindow.focus();
+    return;
+  }
+
+  loginWindow = new BrowserWindow({
+    width: 380,
+    height: 480,
+    resizable: false,
+    minimizable: true,
+    maximizable: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload-social.js'),
+    },
+    backgroundColor: '#0d0d0d',
+    title: 'OpenClaw — Login',
+  });
+
+  loginWindow.loadFile(path.join(__dirname, 'renderer', 'login.html'));
+  loginWindow.on('closed', () => { loginWindow = null; });
+}
+
+function openSocialWindow() {
+  if (socialWindow && !socialWindow.isDestroyed()) {
+    socialWindow.focus();
+    return;
+  }
+
+  socialWindow = new BrowserWindow({
+    width: 480,
+    height: 560,
+    resizable: true,
+    minimizable: true,
+    maximizable: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload-social.js'),
+    },
+    backgroundColor: '#0d0d0d',
+    title: 'OpenClaw — Social Ranking',
+  });
+
+  socialWindow.loadFile(path.join(__dirname, 'renderer', 'social.html'));
+  socialWindow.on('closed', () => { socialWindow = null; });
+}
+
+// ── Social: start sync after login ──────────────────────────────────────
+
+async function startSocialSync() {
+  if (!usageDB) usageDB = new UsageDB();
+  if (socialSync) socialSync.stop();
+
+  socialSync = new SocialSync(usageDB);
+  await socialSync.start();
+  console.log('Social sync started');
+
+  // If session monitor is active, feed vibing status
+  if (sessionMonitor) {
+    const updateVibing = (data) => {
+      const busyProjects = (data.sessions || [])
+        .filter(s => s.busy)
+        .map(s => s.project)
+        .filter(Boolean);
+      const isVibing = busyProjects.length > 0;
+      const projectStr = busyProjects.join(', ') || null;
+      socialSync.setVibing(isVibing, projectStr).catch(() => {});
+    };
+    sessionMonitor.on('sessions-updated', updateVibing);
+  }
+}
+
+// ── Social IPC handlers ─────────────────────────────────────────────────
+
+ipcMain.handle('social-sign-up', async (event, email, password, username) => {
+  try {
+    const result = await supabaseClient.signUp(email, password, username);
+    // Start sync after signup
+    await startSocialSync();
+    // Process pending invite code from deep link (auto-add friend)
+    let friendAdded = null;
+    if (pendingInviteCode && socialSync) {
+      try {
+        const addResult = await socialSync.addFriend(pendingInviteCode);
+        if (addResult?.success) friendAdded = addResult.friend?.username;
+      } catch { /* ignore */ }
+      pendingInviteCode = null;
+    }
+    // Don't close loginWindow yet — let the renderer show the invite code panel.
+    // The window closes when the user clicks "Continue" (triggers __continue__).
+    return { success: true, inviteCode: result.inviteCode, friendAdded };
+  } catch (err) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('social-sign-in', async (event, email, password) => {
+  // Special '__continue__' signal from the success panel
+  if (email === '__continue__') {
+    if (loginWindow && !loginWindow.isDestroyed()) loginWindow.close();
+    return { success: true };
+  }
+
+  try {
+    await supabaseClient.signIn(email, password);
+    await startSocialSync();
+    // Process pending invite code from deep link (auto-add friend)
+    if (pendingInviteCode && socialSync) {
+      try {
+        const addResult = await socialSync.addFriend(pendingInviteCode);
+        if (addResult?.success && Notification.isSupported()) {
+          new Notification({
+            title: 'Friend added!',
+            body: `${addResult.friend?.username || 'New friend'} has been added.`,
+            silent: false,
+          }).show();
+        }
+      } catch { /* ignore */ }
+      pendingInviteCode = null;
+    }
+    if (loginWindow && !loginWindow.isDestroyed()) loginWindow.close();
+    return { success: true };
+  } catch (err) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('social-sign-out', async () => {
+  try {
+    if (socialSync) { socialSync.stop(); socialSync = null; }
+    await supabaseClient.signOut();
+    if (socialWindow && !socialWindow.isDestroyed()) socialWindow.close();
+    return { success: true };
+  } catch (err) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('social-is-logged-in', async () => {
+  const user = await supabaseClient.getCurrentUser();
+  return { loggedIn: !!user };
+});
+
+ipcMain.handle('social-get-profile', async () => {
+  return await supabaseClient.getMyProfile();
+});
+
+ipcMain.handle('social-add-friend', async (event, code) => {
+  if (!socialSync) return { success: false, error: 'Not logged in' };
+  return await socialSync.addFriend(code);
+});
+
+ipcMain.handle('social-get-friends', async () => {
+  if (!socialSync) return [];
+  return await socialSync.getFriends();
+});
+
+ipcMain.handle('social-remove-friend', async (event, friendId) => {
+  if (!socialSync) return;
+  return await socialSync.removeFriend(friendId);
+});
+
+ipcMain.handle('social-friend-ranking', async (event, period) => {
+  if (!socialSync) return [];
+  return await socialSync.getFriendRanking(period || 'all');
+});
+
+ipcMain.handle('social-global-ranking', async (event, period) => {
+  if (!socialSync) return [];
+  return await socialSync.getGlobalRanking(period || 'all');
+});
+
 // Context menu
 ipcMain.handle('show-context-menu', (event) => {
   const template = [
@@ -590,6 +869,23 @@ ipcMain.handle('show-context-menu', (event) => {
       label: 'Open Config',
       click: () => {
         shell.openPath(CONFIG_FILE);
+      }
+    },
+    {
+      label: '🏆 Usage Ranking',
+      click: () => {
+        openRankingWindow();
+      }
+    },
+    {
+      label: '🌐 Social Ranking',
+      click: async () => {
+        const user = await supabaseClient.getCurrentUser();
+        if (user) {
+          openSocialWindow();
+        } else {
+          openLoginWindow();
+        }
       }
     },
     {
@@ -742,8 +1038,100 @@ ipcMain.handle('show-context-menu', (event) => {
   menu.popup(BrowserWindow.fromWebContents(event.sender));
 });
 
+// ── Deep link protocol: openclaw://invite/CODE ──────────────────────────
+
+// Register the custom protocol (macOS: works after first launch sets the handler)
+if (process.defaultApp) {
+  // Dev mode: need to pass the app path
+  app.setAsDefaultProtocolClient('openclaw', process.execPath, [path.resolve(process.argv[1])]);
+} else {
+  app.setAsDefaultProtocolClient('openclaw');
+}
+
+/**
+ * Parse an openclaw:// URL and handle the invite flow.
+ * - If logged in → add friend immediately
+ * - If not logged in → store pendingInviteCode, open login; friend added after login
+ */
+async function handleDeepLink(url) {
+  console.log('Deep link received:', url);
+  // Parse: openclaw://invite/ABCD1234
+  const match = url.match(/openclaw:\/\/invite\/([A-Za-z0-9]+)/);
+  if (!match) return;
+
+  const code = match[1].toUpperCase();
+  console.log('Invite code from deep link:', code);
+
+  const user = await supabaseClient.getCurrentUser();
+  if (user && socialSync) {
+    // Already logged in — add friend directly
+    try {
+      const result = await socialSync.addFriend(code);
+      if (result?.success) {
+        console.log('Friend added via deep link:', result.friend?.username);
+        if (Notification.isSupported()) {
+          new Notification({
+            title: 'Friend added!',
+            body: `${result.friend?.username || 'New friend'} has been added.`,
+            silent: false,
+          }).show();
+        }
+        // Open social window to show the result
+        openSocialWindow();
+      } else {
+        console.log('Deep link add friend failed:', result?.error);
+        if (Notification.isSupported()) {
+          new Notification({
+            title: 'Could not add friend',
+            body: result?.error || 'Unknown error',
+            silent: false,
+          }).show();
+        }
+      }
+    } catch (err) {
+      console.error('Deep link addFriend error:', err.message);
+    }
+  } else {
+    // Not logged in — queue the code and open login
+    pendingInviteCode = code;
+    openLoginWindow();
+  }
+}
+
+// macOS: app is already running, opened via URL
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  handleDeepLink(url);
+});
+
+// Windows/Linux: second instance launched with URL arg
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, argv) => {
+    // The URL is the last argument
+    const url = argv.find(arg => arg.startsWith('openclaw://'));
+    if (url) handleDeepLink(url);
+    // Focus main window
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
+
+// Also check process.argv for URL on first launch
+const launchUrl = process.argv.find(arg => arg.startsWith('openclaw://'));
+
 // App event handlers
 app.whenReady().then(() => {
+  // Handle deep link from launch args
+  if (launchUrl) {
+    // Defer until services are up
+    setTimeout(() => handleDeepLink(launchUrl), 2000);
+  }
+
   // Check if authentication exists
   if (!hasAuth()) {
     createSetupWindow();

@@ -186,6 +186,20 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
   /**
    * Convert the raw API response into the normalized format the app expects.
    */
+  /**
+   * Detect the subscription tier from keychain credentials.
+   * Returns a normalized string: 'pro', 'max_100', or 'max_200'.
+   */
+  getSubscriptionTier() {
+    const creds = this.readKeychainCredentials();
+    const raw = (creds?.subscriptionType || '').toLowerCase();
+    if (raw.includes('200') || raw.includes('max_200')) return 'max_200';
+    if (raw.includes('max') || raw.includes('100')) return 'max_100';
+    if (raw.includes('pro')) return 'pro';
+    // Default: if we got this far via OAuth, assume at least pro
+    return 'pro';
+  }
+
   normalizeUsageData(apiData) {
     const fiveHour = apiData.five_hour;
     const sevenDay = apiData.seven_day;
@@ -196,6 +210,10 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
     const primaryUtilization = fiveHour?.utilization ?? 0;
     const primaryResetAt = fiveHour?.resets_at ?? null;
 
+    // Read actual subscription tier from keychain
+    const tier = this.getSubscriptionTier();
+    const tierLabels = { pro: 'Claude Pro', max_100: 'Claude Max', max_200: 'Claude Max ($200)' };
+
     return {
       // Primary usage (5-hour window)
       percentage: Math.round(primaryUtilization),
@@ -204,7 +222,8 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
       limit: 100,
       resetAt: primaryResetAt,
       reset_at: primaryResetAt,
-      subscription: 'Claude Max',
+      subscription: tierLabels[tier] || 'Claude Pro',
+      subscriptionTier: tier,
       type: '5-hour',
       realData: true,
       source: 'claude-oauth-api',

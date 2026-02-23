@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenClaw — Social Ranking</title>
+  <link rel="stylesheet" href="social.css" />
+</head>
+<body>
+  <div id="social-container">
+    <!-- Header -->
+    <div id="header">
+      <div id="title">OPENCLAW RANKING</div>
+      <div id="user-info">
+        <span id="username">---</span>
+        <button id="invite-btn" class="header-btn" title="Your invite code">Invite</button>
+        <button id="signout-btn" class="header-btn" title="Sign out">Out</button>
+      </div>
+    </div>
+
+    <!-- Main Tabs (Friends / Global / Status) -->
+    <div id="main-tabs">
+      <button class="main-tab active" data-tab="friends">Friends</button>
+      <button class="main-tab" data-tab="global">Global</button>
+      <button class="main-tab" data-tab="status">Status</button>
+    </div>
+
+    <!-- Period Tabs (Today / 7d / 30d / All) -->
+    <div id="period-tabs">
+      <button class="period-tab active" data-period="today">TODAY</button>
+      <button class="period-tab" data-period="7d">7 DAYS</button>
+      <button class="period-tab" data-period="30d">30 DAYS</button>
+      <button class="period-tab" data-period="all">ALL</button>
+    </div>
+
+    <!-- Ranking Table -->
+    <div id="ranking-section">
+      <div id="table-header">
+        <span class="col-rank">#</span>
+        <span class="col-user">USER</span>
+        <span class="col-usage">TOKENS</span>
+        <span class="col-sessions">SESS</span>
+        <span class="col-time">TIME</span>
+        <span class="col-vibing">STATUS</span>
+      </div>
+      <div id="table-body">
+        <div id="loading">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Status Tab Content (hidden by default) -->
+    <div id="status-section" class="hidden">
+      <div id="status-list"></div>
+    </div>
+
+    <!-- Add Friend Panel -->
+    <div id="add-friend-panel">
+      <input type="text" id="friend-code-input" placeholder="Enter invite code..." maxlength="8" />
+      <button id="add-friend-btn" class="action-btn">Add Friend</button>
+      <div id="friend-result" class="hidden"></div>
+    </div>
+
+    <!-- Invite Code Modal -->
+    <div id="invite-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-title">YOUR INVITE LINK</div>
+        <div id="modal-invite-link" class="invite-link">Loading invite link...</div>
+        <div class="modal-hint">Share this link — friends who click it are added automatically.</div>
+        <button id="modal-copy-btn" class="action-btn">Copy Link</button>
+        <button id="modal-close-btn" class="small-link">Close</button>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div id="footer">
+      <span id="footer-text">AUTO-REFRESH 30s</span>
+    </div>
+  </div>
+
+  <script src="social.js"></script>
+</body>
+</html>

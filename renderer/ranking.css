@@ -1,0 +1,313 @@
+/* ── Reset ── */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  font-size: 11px;
+  color: #ccc;
+  background: #0d0d0d;
+  overflow-y: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ── Container ── */
+#ranking-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+/* ── Header ── */
+#header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #333;
+}
+
+#title {
+  color: #cd7f5d;
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 2px;
+}
+
+#total-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#total-label {
+  color: #666;
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+
+#total-value {
+  color: #39ff14;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* ── Period Tabs ── */
+#period-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.tab {
+  flex: 1;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  color: #666;
+  font-family: inherit;
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tab:hover {
+  border-color: #555;
+  color: #aaa;
+}
+
+.tab.active {
+  background: #222;
+  border-color: #cd7f5d;
+  color: #cd7f5d;
+}
+
+/* ── Table ── */
+#ranking-table {
+  flex: 1;
+}
+
+#table-header {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-bottom: 2px solid #444;
+  color: #666;
+  font-size: 8px;
+  letter-spacing: 1px;
+}
+
+#table-body {
+  border: 1px solid #333;
+  border-top: none;
+  min-height: 120px;
+}
+
+/* ── Column widths ── */
+.col-rank {
+  width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.col-project {
+  flex: 1;
+  min-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.col-usage {
+  width: 60px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.col-time {
+  width: 55px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.col-sessions {
+  width: 36px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ── Table Row ── */
+.ranking-row {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  border-bottom: 1px solid #1a1a1a;
+  transition: background 0.1s ease;
+}
+
+.ranking-row:hover {
+  background: #1a1a1a;
+}
+
+.ranking-row:last-child {
+  border-bottom: none;
+}
+
+/* Rank badge */
+.ranking-row .col-rank {
+  font-weight: bold;
+  font-size: 11px;
+}
+
+.ranking-row.rank-1 .col-rank { color: #ffd700; }
+.ranking-row.rank-2 .col-rank { color: #c0c0c0; }
+.ranking-row.rank-3 .col-rank { color: #cd7f32; }
+.ranking-row:not(.rank-1):not(.rank-2):not(.rank-3) .col-rank { color: #555; }
+
+/* Project name */
+.ranking-row .col-project {
+  color: #e0e0e0;
+  font-size: 11px;
+}
+
+.ranking-row.rank-1 .col-project { color: #fff; }
+
+/* Usage bar + value */
+.ranking-row .col-usage {
+  position: relative;
+}
+
+.usage-value {
+  color: #39ff14;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.ranking-row.rank-1 .usage-value {
+  color: #39ff14;
+  text-shadow: 0 0 4px rgba(57, 255, 20, 0.4);
+}
+
+/* Usage bar underneath project name */
+.project-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 80px;
+  overflow: hidden;
+}
+
+.project-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.usage-bar {
+  height: 2px;
+  background: #222;
+  width: 100%;
+  position: relative;
+}
+
+.usage-bar-fill {
+  height: 100%;
+  background: #39ff14;
+  transition: width 0.3s ease;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.ranking-row.rank-1 .usage-bar-fill { background: #ffd700; }
+.ranking-row.rank-2 .usage-bar-fill { background: #c0c0c0; }
+.ranking-row.rank-3 .usage-bar-fill { background: #cd7f32; }
+
+/* Time and sessions */
+.ranking-row .col-time {
+  color: #888;
+  font-size: 9px;
+}
+
+.ranking-row .col-sessions {
+  color: #666;
+  font-size: 9px;
+}
+
+/* ── Empty state ── */
+#empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  color: #444;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  padding: 20px;
+  text-align: center;
+}
+
+#empty-state.hidden {
+  display: none;
+}
+
+/* ── Footer ── */
+#footer {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #222;
+  text-align: center;
+}
+
+#footer-text {
+  color: #444;
+  font-size: 8px;
+  letter-spacing: 0.5px;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0d0d0d;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* ── Pixel decorations ── */
+#header::before,
+#header::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 4px;
+}
+
+/* ── Loading animation ── */
+@keyframes pulse-row {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.ranking-row.updating {
+  animation: pulse-row 1s ease-in-out;
+}

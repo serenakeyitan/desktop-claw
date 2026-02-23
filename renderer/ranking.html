@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Usage Ranking</title>
+  <link rel="stylesheet" href="ranking.css">
+</head>
+<body>
+  <div id="ranking-container">
+    <!-- Header -->
+    <div id="header">
+      <div id="title">USAGE RANKING</div>
+      <div id="total-bar">
+        <span id="total-label">TOTAL</span>
+        <span id="total-value">--</span>
+      </div>
+    </div>
+
+    <!-- Period Tabs -->
+    <div id="period-tabs">
+      <button class="tab active" data-period="today">TODAY</button>
+      <button class="tab" data-period="7d">7 DAYS</button>
+      <button class="tab" data-period="30d">30 DAYS</button>
+      <button class="tab" data-period="all">ALL</button>
+    </div>
+
+    <!-- Ranking Table -->
+    <div id="ranking-table">
+      <div id="table-header">
+        <span class="col-rank">#</span>
+        <span class="col-project">PROJECT</span>
+        <span class="col-usage">USAGE</span>
+        <span class="col-time">TIME</span>
+        <span class="col-sessions">SESS</span>
+      </div>
+      <div id="table-body">
+        <!-- Rows populated by JS -->
+        <div id="empty-state">No usage data yet. Start using Claude Code!</div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div id="footer">
+      <span id="footer-text">Tracking active Claude Code sessions</span>
+    </div>
+  </div>
+
+  <script src="ranking.js"></script>
+</body>
+</html>
