@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu, shell, dialog, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, shell, dialog, screen, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -8,6 +8,7 @@ const LogWatcher = require('./watcher');
 const AuthManager = require('./auth-manager');
 const UsageTracker = require('./usage-tracker');
 const AutoUsageUpdater = require('./auto-usage-updater');
+const SessionMonitor = require('./session-monitor');
 
 // Configuration
 const CONFIG_DIR = path.join(os.homedir(), '.openclaw-pet');
@@ -21,6 +22,7 @@ let proxyServer;
 let logWatcher;
 let usageTracker;
 let autoUsageUpdater;
+let sessionMonitor;
 let currentState = 'idle';
 let lastActivityTime = Date.now();
 let windowPosition = null;
@@ -135,7 +137,7 @@ function createMainWindow() {
 
   // Calculate default position (bottom-right with 20px margin)
   const windowWidth = 180;
-  const windowHeight = 150;
+  const windowHeight = 200;
   let x = config.position.x !== null ? config.position.x : screenWidth - windowWidth - 20;
   let y = config.position.y !== null ? config.position.y : screenHeight - windowHeight - 20;
 
@@ -355,6 +357,62 @@ async function initializeServices() {
   } catch (error) {
     console.error('Failed to start log watcher:', error);
   }
+
+  // Start session monitor to detect active Claude Code sessions
+  try {
+    sessionMonitor = new SessionMonitor({ pollIntervalSeconds: 5 });
+
+    sessionMonitor.on('session-started', (session) => {
+      // Only notify for sessions that are actively working
+      if (session.status === 'busy') {
+        setActivityState('active');
+      }
+    });
+
+    sessionMonitor.on('session-ended', (session) => {
+      // Process exited entirely
+      if (Notification.isSupported()) {
+        new Notification({
+          title: 'Claude session closed',
+          body: `${session.project || 'Unknown project'} exited after ${session.duration}`,
+          silent: false,
+        }).show();
+      }
+    });
+
+    sessionMonitor.on('session-task-finished', (data) => {
+      // A session went from busy to idle — the key notification
+      if (Notification.isSupported()) {
+        new Notification({
+          title: 'Claude finished running',
+          body: `${data.project || 'Unknown project'} is done (ran for ${data.busyDuration})`,
+          silent: false,
+        }).show();
+      }
+    });
+
+    sessionMonitor.on('session-task-started', (data) => {
+      // A session went from idle to busy
+      setActivityState('active');
+    });
+
+    sessionMonitor.on('sessions-updated', (data) => {
+      // Forward session data to renderer
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('session-update', data);
+      }
+
+      // Only keep robot active if sessions are actually busy
+      if (data.busyCount > 0) {
+        setActivityState('active');
+      }
+    });
+
+    sessionMonitor.start();
+    console.log('Session monitor started');
+  } catch (error) {
+    console.error('Failed to start session monitor:', error);
+  }
 }
 
 // Cleanup services
@@ -374,6 +432,10 @@ function cleanupServices() {
   if (logWatcher) {
     logWatcher.stop();
     logWatcher = null;
+  }
+  if (sessionMonitor) {
+    sessionMonitor.stop();
+    sessionMonitor = null;
   }
 }
 

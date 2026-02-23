@@ -19,17 +19,197 @@ body {
 /* Widget Container */
 #widget-container {
   width: 180px;
-  height: 150px;
+  height: 200px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding: 10px;
   position: relative;
   -webkit-app-region: drag;
 }
 
-/* Robot Container */
+/* ── Hover Bubble ── */
+#bubble {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+}
+
+/* Show bubble on hover over the whole widget */
+#widget-container:hover #bubble {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#bubble-inner {
+  background: #1a1a1a;
+  border: 2px solid #444;
+  padding: 8px 10px;
+  min-width: 160px;
+  max-width: 180px;
+  /* Pixel art stepped border effect */
+  image-rendering: pixelated;
+  position: relative;
+}
+
+/* Pixel corner accents */
+#bubble-inner::before,
+#bubble-inner::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #cd7f5d;
+}
+#bubble-inner::before { top: -2px; left: -2px; }
+#bubble-inner::after { top: -2px; right: -2px; }
+
+/* Tail pointing down toward the robot */
+#bubble-tail {
+  width: 0;
+  height: 0;
+  margin: 0 auto;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #444;
+  position: relative;
+}
+#bubble-tail::after {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: -4px;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid #1a1a1a;
+}
+
+/* ── Bubble content ── */
+#bubble-usage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+#token-bar {
+  flex: 1;
+  height: 3px;
+  background: #222;
+  position: relative;
+  overflow: hidden;
+  border: none;
+}
+
+#token-fill {
+  height: 100%;
+  width: 0%;
+  background: #39ff14;
+  transition: width 0.3s ease, background-color 0.3s ease;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+/* Token fill colors based on percentage */
+#token-fill.high { background: #39ff14; }
+#token-fill.medium { background: #ffcc00; }
+#token-fill.low { background: #ff3333; }
+
+/* Segmented pixel effect for token bar */
+#token-fill::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.1) 2px,
+    rgba(0, 0, 0, 0.1) 3px
+  );
+}
+
+#token-percentage {
+  color: #e0e0e0;
+  font-size: 9px;
+  min-width: 60px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+#token-percentage.active {
+  color: #fff;
+}
+
+#token-percentage.urgent {
+  color: #ff3333;
+}
+
+#bubble-reset {
+  text-align: center;
+  margin-bottom: 2px;
+}
+
+#countdown-text {
+  color: #888;
+  font-size: 8px;
+  transition: color 0.3s ease;
+}
+
+#countdown-text.urgent {
+  color: #ff3333;
+  animation: pulse-text 1s ease-in-out infinite;
+}
+
+#countdown-text.error { color: #ff3333; }
+#countdown-text.demo { color: #ffcc00; }
+
+/* Session info inside bubble */
+#bubble-sessions {
+  text-align: center;
+  min-height: 0;
+}
+
+#session-text {
+  color: #39ff14;
+  font-size: 8px;
+  letter-spacing: 0.5px;
+}
+
+#session-text:empty {
+  display: none;
+}
+
+#session-text .session-dot {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  margin-right: 3px;
+  vertical-align: middle;
+}
+
+#session-text .session-dot.busy {
+  background: #39ff14;
+  animation: indicator-blink 1.5s ease-in-out infinite;
+}
+
+#session-text .session-dot.idle {
+  background: #666;
+  animation: none;
+}
+
+#session-text .session-busy { color: #39ff14; }
+#session-text .session-idle { color: #666; }
+
+/* ── Robot Container ── */
 #robot-container {
   width: 96px;
   height: 64px;
@@ -71,124 +251,10 @@ body {
   filter: drop-shadow(0 0 2px currentColor);
 }
 
-/* Stats Container */
-#stats-container {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: center;
-  -webkit-app-region: no-drag;
-}
-
-/* Token Bar */
-#token-bar-wrapper {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-#token-bar {
-  flex: 1;
-  height: 3px;
-  background: #222;
-  position: relative;
-  overflow: hidden;
-  border: none;
-}
-
-#token-fill {
-  height: 100%;
-  width: 0%;
-  background: #39ff14;
-  transition: width 0.3s ease, background-color 0.3s ease;
-  position: absolute;
-  left: 0;
-  top: 0;
-}
-
-/* Token fill colors based on percentage */
-#token-fill.high {
-  background: #39ff14;
-}
-
-#token-fill.medium {
-  background: #ffcc00;
-}
-
-#token-fill.low {
-  background: #ff3333;
-}
-
-/* Segmented pixel effect for token bar */
-#token-fill::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-image: repeating-linear-gradient(
-    90deg,
-    transparent,
-    transparent 2px,
-    rgba(0, 0, 0, 0.1) 2px,
-    rgba(0, 0, 0, 0.1) 3px
-  );
-}
-
-#token-percentage {
-  color: #888;
-  font-size: 9px;
-  min-width: 35px;
-  text-align: right;
-}
-
-#token-percentage.active {
-  color: #fff;
-}
-
-/* Countdown */
-#countdown-wrapper {
-  width: 100%;
-  text-align: center;
-}
-
-#countdown-text {
-  color: #888;
-  font-size: 9px;
-  transition: color 0.3s ease;
-}
-
-#countdown-text.urgent {
-  color: #ff3333;
-  animation: pulse-text 1s ease-in-out infinite;
-}
-
-#countdown-text.error {
-  color: #ff3333;
-}
-
-#countdown-text.demo {
-  color: #ffcc00;
-}
-
-/* CRT Scanline Effect */
-.scanlines {
-  pointer-events: none;
-  opacity: 0.05;
-  z-index: 100;
-}
-
 /* Animations */
 @keyframes float {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-3px);
-  }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
 }
 
 @keyframes vibrate {

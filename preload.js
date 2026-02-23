@@ -35,10 +35,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('reset-tick', (event, data) => callback(data));
   },
 
+  onSessionUpdate: (callback) => {
+    ipcRenderer.on('session-update', (event, data) => callback(data));
+  },
+
   // Remove listeners
   removeAllListeners: () => {
     ipcRenderer.removeAllListeners('token-update');
     ipcRenderer.removeAllListeners('state-change');
     ipcRenderer.removeAllListeners('reset-tick');
+    ipcRenderer.removeAllListeners('session-update');
   }
 });

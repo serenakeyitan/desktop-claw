@@ -8,24 +8,31 @@
 </head>
 <body>
   <div id="widget-container">
+    <!-- Hover Bubble (hidden by default) -->
+    <div id="bubble">
+      <div id="bubble-inner">
+        <!-- Usage row -->
+        <div id="bubble-usage">
+          <div id="token-bar">
+            <div id="token-fill"></div>
+          </div>
+          <span id="token-percentage">-- %</span>
+        </div>
+        <!-- Reset countdown -->
+        <div id="bubble-reset">
+          <span id="countdown-text">no api key</span>
+        </div>
+        <!-- Session info -->
+        <div id="bubble-sessions">
+          <span id="session-text"></span>
+        </div>
+      </div>
+      <!-- Pixel tail/arrow -->
+      <div id="bubble-tail"></div>
+    </div>
+
     <!-- Robot Container -->
     <div id="robot-container"></div>
-
-    <!-- Stats Display -->
-    <div id="stats-container">
-      <!-- Token Usage Bar -->
-      <div id="token-bar-wrapper">
-        <div id="token-bar">
-          <div id="token-fill"></div>
-        </div>
-        <span id="token-percentage">-- %</span>
-      </div>
-
-      <!-- Reset Countdown -->
-      <div id="countdown-wrapper">
-        <span id="countdown-text">no api key</span>
-      </div>
-    </div>
   </div>
 
   <!-- Scripts -->

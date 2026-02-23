@@ -126,6 +126,33 @@ function setupIPC() {
       stats.updateCountdown(data.timeLeft);
     }
   });
+
+  // Listen for session updates
+  window.electronAPI.onSessionUpdate((data) => {
+    const sessionText = document.getElementById('session-text');
+    if (!sessionText) return;
+
+    if (data.count > 0) {
+      // Build per-session display with busy/idle indicator
+      const items = data.sessions.slice(0, 3).map(s => {
+        const name = s.project || 'unknown';
+        if (s.busy) {
+          return `<span class="session-busy">${name}</span>`;
+        }
+        return `<span class="session-idle">${name}</span>`;
+      });
+
+      const dotClass = data.busyCount > 0 ? 'session-dot busy' : 'session-dot idle';
+      const summary = data.busyCount > 0
+        ? `${data.busyCount} running`
+        : `${data.count} idle`;
+
+      sessionText.innerHTML =
+        `<span class="${dotClass}"></span>${summary}: ${items.join(', ')}`;
+    } else {
+      sessionText.innerHTML = '';
+    }
+  });
 }
 
 // Cleanup on window close
