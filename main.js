@@ -728,14 +728,15 @@ async function startSocialSync() {
   console.log('Social sync started');
 
   // If session monitor is active, feed vibing status
+  // Any open Claude Code session = vibing (LIVE), not just busy ones
   if (sessionMonitor) {
     const updateVibing = (data) => {
-      const busyProjects = (data.sessions || [])
-        .filter(s => s.busy)
+      const allSessions = data.sessions || [];
+      const allProjects = allSessions
         .map(s => s.project)
         .filter(Boolean);
-      const isVibing = busyProjects.length > 0;
-      const projectStr = busyProjects.join(', ') || null;
+      const isVibing = allSessions.length > 0;
+      const projectStr = allProjects.join(', ') || null;
       socialSync.setVibing(isVibing, projectStr).catch(() => {});
     };
     sessionMonitor.on('sessions-updated', updateVibing);
