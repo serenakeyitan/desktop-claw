@@ -1,19 +1,31 @@
 /**
  * Claude Code Session Monitor
  *
- * Detects active Claude Code sessions by scanning running processes,
- * tracks their lifecycle and activity state (busy vs idle) using
- * cumulative CPU time deltas, and emits events when sessions start,
- * end, or finish a task.
+ * Detects active Claude Code sessions using a hybrid approach:
  *
- * Uses cputime (cumulative CPU seconds) instead of %cpu because %cpu
- * from ps on macOS is a lifetime average that stays elevated for
- * long-running processes even when idle.
+ * 1. PRIMARY: Scans ~/.claude/debug/*.txt for recently-modified files.
+ *    Each debug file corresponds to one Claude Code session and contains
+ *    the project path in its first few lines. A file modified within the
+ *    last FRESHNESS_THRESHOLD_SEC seconds is considered active.
+ *
+ * 2. SUPPLEMENT: Uses `ps` to get CPU time for each detected session,
+ *    enabling busy/idle tracking via cumulative CPU time deltas.
+ *
+ * 3. FALLBACK: If no debug files are found, falls back to pure process
+ *    scanning (legacy approach).
+ *
+ * The debug-file approach is more accurate than process scanning because:
+ * - No process name ambiguity (claude vs node vs npx)
+ * - Works regardless of how Claude was launched
+ * - Reliably extracts project info from file contents
+ * - Active sessions = recently modified debug files
  */
 
 const { execSync } = require('child_process');
 const EventEmitter = require('events');
+const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 // If a process consumes less than this many CPU-seconds per poll interval,
 // it is considered idle (waiting at the prompt). A truly idle Claude process
@@ -27,12 +39,19 @@ const IDLE_CONFIRM_POLLS = 6;
 // Minimum busy duration (ms) before a task-finished notification fires.
 const MIN_BUSY_DURATION_MS = 30 * 1000; // 30 seconds
 
+// Debug files modified more recently than this are considered active sessions.
+// Set to 2 minutes to be generous — active sessions write debug output frequently.
+const FRESHNESS_THRESHOLD_SEC = 120;
+
+// Claude debug directory
+const CLAUDE_DEBUG_DIR = path.join(os.homedir(), '.claude', 'debug');
+
 class SessionMonitor extends EventEmitter {
   constructor(options = {}) {
     super();
     this.pollIntervalMs = (options.pollIntervalSeconds || 5) * 1000;
     this.pollTimer = null;
-    // Map of PID -> session info (includes activity tracking)
+    // Map of sessionId (debug file UUID or PID) -> session info
     this.sessions = new Map();
   }
 
@@ -53,90 +72,158 @@ class SessionMonitor extends EventEmitter {
   }
 
   /**
+   * PRIMARY DETECTION: Scan ~/.claude/debug/ for active sessions.
+   *
+   * Returns an array of { sessionId, project, cwd, mtime } objects
+   * for each debug file modified within FRESHNESS_THRESHOLD_SEC.
+   */
+  scanDebugFiles() {
+    const sessions = [];
+    const now = Date.now();
+    const thresholdMs = FRESHNESS_THRESHOLD_SEC * 1000;
+
+    try {
+      if (!fs.existsSync(CLAUDE_DEBUG_DIR)) return sessions;
+
+      const files = fs.readdirSync(CLAUDE_DEBUG_DIR)
+        .filter(f => f.endsWith('.txt'));
+
+      for (const file of files) {
+        const filePath = path.join(CLAUDE_DEBUG_DIR, file);
+        try {
+          const stat = fs.statSync(filePath);
+          const ageMs = now - stat.mtimeMs;
+
+          if (ageMs > thresholdMs) continue; // stale file, skip
+
+          // Extract session UUID from filename (e.g., "15a82081-1bfb-4296-bc94-48af7f932284.txt")
+          const sessionId = file.replace('.txt', '');
+
+          // Extract project path from file content
+          const projectInfo = this._extractProjectFromDebugFile(filePath);
+
+          sessions.push({
+            sessionId,
+            cwd: projectInfo.cwd,
+            project: projectInfo.project,
+            mtime: stat.mtimeMs,
+            ageMs,
+            filePath,
+            fileSize: stat.size,
+          });
+        } catch {
+          // Skip files we can't stat/read
+        }
+      }
+    } catch {
+      // Debug directory doesn't exist or isn't readable
+    }
+
+    return sessions;
+  }
+
+  /**
+   * Extract the project path from a Claude Code debug file.
+   *
+   * Tries two patterns from the first 5 lines:
+   * 1. settings.local.json path: ".../<project>/.claude/settings.local.json"
+   * 2. skills project path: "project=/<path>/.claude/skills"
+   */
+  _extractProjectFromDebugFile(filePath) {
+    try {
+      // Read just the first 1KB — project info is always in the first few lines
+      const fd = fs.openSync(filePath, 'r');
+      const buf = Buffer.alloc(1024);
+      const bytesRead = fs.readSync(fd, buf, 0, 1024, 0);
+      fs.closeSync(fd);
+
+      const header = buf.toString('utf8', 0, bytesRead);
+
+      // Pattern 1: settings.local.json path
+      // e.g., "/Users/keyitan/desktop_bot/.claude/settings.local.json"
+      const localSettingsMatch = header.match(/\/([^\s,]+)\/\.claude\/settings\.local\.json/);
+      if (localSettingsMatch) {
+        const cwd = '/' + localSettingsMatch[1];
+        return { cwd, project: path.basename(cwd) };
+      }
+
+      // Pattern 2: skills project path
+      // e.g., "project=/Users/keyitan/peer-kael-claw/.claude/skills"
+      const skillsMatch = header.match(/project=([^\s,]+)\/\.claude\/skills/);
+      if (skillsMatch) {
+        const cwd = skillsMatch[1];
+        return { cwd, project: path.basename(cwd) };
+      }
+    } catch {
+      // Can't read file
+    }
+
+    return { cwd: null, project: null };
+  }
+
+  /**
    * Scan for running Claude Code processes.
-   * Returns an array of { pid, tty, elapsed, cpuTimeSec, cwd, ... } objects.
+   * Returns array of { pid, tty, elapsed, elapsedMs, cpuTimeSec, cwd, project }.
+   *
+   * Uses two strategies to catch all Claude processes regardless of how
+   * the binary appears in ps output (claude vs node).
    */
   scanProcesses() {
     const seenPids = new Set();
     const processes = [];
 
-    // Strategy 1: Match processes with comm == "claude" (standard install)
-    try {
-      const raw = execSync(
-        `ps -eo pid,tty,etime,cputime,comm | grep -w "claude$" | grep -v grep`,
-        { encoding: 'utf8', timeout: 5000 }
-      ).trim();
+    const commands = [
+      // Strategy 1: Match processes with comm == "claude"
+      `ps -eo pid,tty,etime,cputime,comm 2>/dev/null | grep -w "claude$" | grep -v grep`,
+      // Strategy 2: Match node processes running claude-code CLI
+      `ps -eo pid,tty,etime,cputime,args 2>/dev/null | grep -E "claude-code|/bin/claude" | grep -v grep`,
+    ];
 
-      if (raw) {
+    for (const cmd of commands) {
+      try {
+        const raw = execSync(cmd, { encoding: 'utf8', timeout: 5000 }).trim();
+        if (!raw) continue;
+
         for (const line of raw.split('\n')) {
           const parts = line.trim().split(/\s+/);
           if (parts.length < 5) continue;
           const pid = parseInt(parts[0], 10);
           if (isNaN(pid) || seenPids.has(pid)) continue;
-          const comm = parts.slice(4).join(' ');
-          if (!comm.endsWith('claude')) continue;
+
+          // Exclude helper processes
+          const rest = parts.slice(4).join(' ');
+          if (rest.includes('Electron') || rest.includes('expect') ||
+              rest.includes('shell-snapshot') || rest.includes('get-claude-usage') ||
+              rest.includes('/bin/zsh')) continue;
+
           seenPids.add(pid);
-          this._addProcess(processes, pid, parts[1], parts[2], parts[3]);
+
+          // Get process cwd via lsof
+          let cwd = null;
+          try {
+            const lsofOut = execSync(
+              `lsof -a -d cwd -p ${pid} -Fn 2>/dev/null | grep "^n/"`,
+              { encoding: 'utf8', timeout: 3000 }
+            ).trim();
+            if (lsofOut) {
+              cwd = lsofOut.replace(/^n/, '');
+            }
+          } catch { /* lsof might fail */ }
+
+          processes.push({
+            pid,
+            tty: parts[1] === '??' ? null : parts[1],
+            elapsed: parts[2],
+            elapsedMs: this.parseElapsed(parts[2]),
+            cpuTimeSec: this.parseCpuTime(parts[3]),
+            cwd,
+            project: cwd ? path.basename(cwd) : null,
+          });
         }
-      }
-    } catch { /* no matches */ }
-
-    // Strategy 2: Match node processes running claude-code CLI
-    // Catches sessions where comm is "node" instead of "claude"
-    // (e.g. npx claude, or newer Claude Code versions)
-    try {
-      const raw2 = execSync(
-        `ps -eo pid,tty,etime,cputime,args | grep -E "claude-code|/bin/claude" | grep -v grep`,
-        { encoding: 'utf8', timeout: 5000 }
-      ).trim();
-
-      if (raw2) {
-        for (const line of raw2.split('\n')) {
-          const parts = line.trim().split(/\s+/);
-          if (parts.length < 5) continue;
-          const pid = parseInt(parts[0], 10);
-          if (isNaN(pid) || seenPids.has(pid)) continue;
-
-          const args = parts.slice(4).join(' ');
-          // Exclude helper processes (Electron, expect scripts, shell snapshots, zsh wrappers)
-          if (args.includes('Electron') || args.includes('expect') ||
-              args.includes('shell-snapshot') || args.includes('get-claude-usage') ||
-              args.includes('/bin/zsh')) continue;
-          seenPids.add(pid);
-          this._addProcess(processes, pid, parts[1], parts[2], parts[3]);
-        }
-      }
-    } catch { /* no matches */ }
-
-    return processes;
-  }
-
-  /**
-   * Helper: enrich a detected process with cwd/project info and add to array.
-   */
-  _addProcess(processes, pid, tty, elapsed, cputime) {
-    let cwd = null;
-    try {
-      const lsofOut = execSync(
-        `lsof -a -d cwd -p ${pid} -Fn 2>/dev/null | grep "^n/"`,
-        { encoding: 'utf8', timeout: 3000 }
-      ).trim();
-      if (lsofOut) {
-        cwd = lsofOut.replace(/^n/, '');
-      }
-    } catch {
-      // lsof might fail for some processes
+      } catch { /* no matches */ }
     }
 
-    processes.push({
-      pid,
-      tty: tty === '??' ? null : tty,
-      elapsed,
-      elapsedMs: this.parseElapsed(elapsed),
-      cpuTimeSec: this.parseCpuTime(cputime),
-      cwd,
-      project: cwd ? path.basename(cwd) : null,
-    });
+    return processes;
   }
 
   /**
@@ -179,97 +266,167 @@ class SessionMonitor extends EventEmitter {
 
   /**
    * Poll once: detect sessions, track CPU time deltas, emit events.
+   *
+   * Uses UNION approach — merges two sources to catch all sessions:
+   * 1. Debug files with fresh mtime → active sessions (best project info)
+   * 2. Process scanning → catches idle sessions with stale debug files
+   *
+   * Sessions are deduplicated by cwd to avoid double-counting.
    */
   poll() {
-    const current = this.scanProcesses();
-    const currentPids = new Set(current.map(p => p.pid));
+    const debugSessions = this.scanDebugFiles();
+    const processes = this.scanProcesses();
 
-    for (const proc of current) {
-      if (!this.sessions.has(proc.pid)) {
-        // New session — we don't know its activity state yet (need 2 polls)
-        const session = {
-          pid: proc.pid,
-          tty: proc.tty,
+    // Build union of sessions, keyed by cwd (or fallback to id)
+    const sessionMap = new Map(); // cwd -> session info
+
+    // First, add debug-file sessions (best project info)
+    for (const ds of debugSessions) {
+      const key = ds.cwd || ds.sessionId;
+      sessionMap.set(key, {
+        id: ds.sessionId,
+        cwd: ds.cwd,
+        project: ds.project,
+        mtime: ds.mtime,
+        ageMs: ds.ageMs,
+        pid: null,
+        tty: null,
+        elapsed: null,
+        elapsedMs: 0,
+        cpuTimeSec: 0,
+      });
+    }
+
+    // Then, merge process info (provides CPU time + catches stale-debug sessions)
+    for (const proc of processes) {
+      const key = proc.cwd || `pid-${proc.pid}`;
+      if (sessionMap.has(key)) {
+        // Enrich existing debug-file session with process data
+        const existing = sessionMap.get(key);
+        existing.pid = proc.pid;
+        existing.tty = proc.tty;
+        existing.elapsed = proc.elapsed;
+        existing.elapsedMs = proc.elapsedMs;
+        existing.cpuTimeSec = proc.cpuTimeSec;
+      } else {
+        // Process-only session (debug file is stale or missing)
+        sessionMap.set(key, {
+          id: `pid-${proc.pid}`,
           cwd: proc.cwd,
           project: proc.project,
-          startedAt: new Date(Date.now() - proc.elapsedMs),
+          mtime: null,
+          ageMs: null,
+          pid: proc.pid,
+          tty: proc.tty,
+          elapsed: proc.elapsed,
           elapsedMs: proc.elapsedMs,
-          lastCpuTimeSec: proc.cpuTimeSec,
+          cpuTimeSec: proc.cpuTimeSec,
+        });
+      }
+    }
+
+    const currentSessions = Array.from(sessionMap.values());
+
+    const currentIds = new Set(currentSessions.map(s => s.id));
+
+    for (const sess of currentSessions) {
+      if (!this.sessions.has(sess.id)) {
+        // New session detected
+        const session = {
+          id: sess.id,
+          pid: sess.pid,
+          tty: sess.tty,
+          cwd: sess.cwd,
+          project: sess.project,
+          startedAt: sess.elapsedMs > 0
+            ? new Date(Date.now() - sess.elapsedMs)
+            : new Date(),
+          elapsedMs: sess.elapsedMs,
+          lastCpuTimeSec: sess.cpuTimeSec,
           cpuDelta: 0,
-          // Start as idle — will transition to busy on next poll if active
           busy: false,
           idlePolls: 0,
           busySince: null,
         };
-        this.sessions.set(proc.pid, session);
+        this.sessions.set(sess.id, session);
 
-        console.log(`Session detected: PID ${proc.pid} in ${proc.project || 'unknown'} (running ${this.formatDuration(proc.elapsedMs)})`);
+        const elapsed = sess.elapsedMs > 0
+          ? ` (running ${this.formatDuration(sess.elapsedMs)})`
+          : '';
+        console.log(`Session detected: ${sess.project || sess.id}${elapsed}`);
         this.emit('session-started', { ...session, status: 'unknown' });
       } else {
-        // Existing session — compute CPU delta and detect transitions
-        const existing = this.sessions.get(proc.pid);
-        existing.elapsedMs = proc.elapsedMs;
-        if (proc.cwd) existing.cwd = proc.cwd;
-        if (proc.project) existing.project = proc.project;
+        // Existing session — update and track CPU delta
+        const existing = this.sessions.get(sess.id);
+        if (sess.elapsedMs > 0) existing.elapsedMs = sess.elapsedMs;
+        if (sess.cwd) existing.cwd = sess.cwd;
+        if (sess.project) existing.project = sess.project;
+        if (sess.pid) existing.pid = sess.pid;
 
-        // CPU time delta since last poll
-        const cpuDelta = proc.cpuTimeSec - existing.lastCpuTimeSec;
-        existing.lastCpuTimeSec = proc.cpuTimeSec;
-        existing.cpuDelta = cpuDelta;
+        // CPU time delta for busy/idle detection (only if we have process info)
+        if (sess.cpuTimeSec > 0) {
+          const cpuDelta = sess.cpuTimeSec - existing.lastCpuTimeSec;
+          existing.lastCpuTimeSec = sess.cpuTimeSec;
+          existing.cpuDelta = cpuDelta;
 
-        const wasActive = existing.busy;
-        const isIdle = cpuDelta < CPU_DELTA_IDLE_THRESHOLD;
+          const wasActive = existing.busy;
+          const isIdle = cpuDelta < CPU_DELTA_IDLE_THRESHOLD;
 
-        if (isIdle) {
-          existing.idlePolls = (existing.idlePolls || 0) + 1;
-        } else {
-          existing.idlePolls = 0;
-        }
+          if (isIdle) {
+            existing.idlePolls = (existing.idlePolls || 0) + 1;
+          } else {
+            existing.idlePolls = 0;
+          }
 
-        if (wasActive && existing.idlePolls >= IDLE_CONFIRM_POLLS) {
-          // Transition: busy -> idle (task finished)
-          existing.busy = false;
-          const busyMs = existing.busySince
-            ? Date.now() - existing.busySince.getTime()
-            : 0;
-          const busyDuration = busyMs > 0
-            ? this.formatDuration(busyMs)
-            : 'unknown';
-          existing.busySince = null;
+          if (wasActive && existing.idlePolls >= IDLE_CONFIRM_POLLS) {
+            // Transition: busy -> idle (task finished)
+            existing.busy = false;
+            const busyMs = existing.busySince
+              ? Date.now() - existing.busySince.getTime()
+              : 0;
+            const busyDuration = busyMs > 0
+              ? this.formatDuration(busyMs)
+              : 'unknown';
+            existing.busySince = null;
 
-          if (busyMs >= MIN_BUSY_DURATION_MS) {
-            console.log(`Session task finished: PID ${proc.pid} in ${existing.project || 'unknown'} (ran for ${busyDuration})`);
-            this.emit('session-task-finished', {
+            if (busyMs >= MIN_BUSY_DURATION_MS) {
+              console.log(`Session task finished: ${existing.project || existing.id} (ran for ${busyDuration})`);
+              this.emit('session-task-finished', {
+                id: existing.id,
+                pid: existing.pid,
+                project: existing.project,
+                cwd: existing.cwd,
+                busyDuration,
+              });
+            } else {
+              console.log(`Session idle: ${existing.project || existing.id} (busy only ${busyDuration}, skipping notification)`);
+            }
+          } else if (!wasActive && !isIdle) {
+            // Transition: idle -> busy (task started)
+            existing.busy = true;
+            existing.idlePolls = 0;
+            existing.busySince = new Date();
+
+            console.log(`Session task started: ${existing.project || existing.id} (CPU delta ${cpuDelta.toFixed(1)}s)`);
+            this.emit('session-task-started', {
+              id: existing.id,
               pid: existing.pid,
               project: existing.project,
               cwd: existing.cwd,
-              busyDuration,
             });
-          } else {
-            console.log(`Session idle: PID ${proc.pid} in ${existing.project || 'unknown'} (busy only ${busyDuration}, skipping notification)`);
           }
-        } else if (!wasActive && !isIdle) {
-          // Transition: idle -> busy (task started)
-          existing.busy = true;
-          existing.idlePolls = 0;
-          existing.busySince = new Date();
-
-          console.log(`Session task started: PID ${proc.pid} in ${existing.project || 'unknown'} (CPU delta ${cpuDelta.toFixed(1)}s)`);
-          this.emit('session-task-started', {
-            pid: existing.pid,
-            project: existing.project,
-            cwd: existing.cwd,
-          });
         }
       }
     }
 
-    // Detect ended sessions (process exited)
-    for (const [pid, session] of this.sessions) {
-      if (!currentPids.has(pid)) {
-        this.sessions.delete(pid);
-        const duration = this.formatDuration(session.elapsedMs);
-        console.log(`Session ended: PID ${pid} in ${session.project || 'unknown'} (was running ${duration})`);
+    // Detect ended sessions
+    for (const [id, session] of this.sessions) {
+      if (!currentIds.has(id)) {
+        this.sessions.delete(id);
+        const duration = session.elapsedMs > 0
+          ? this.formatDuration(session.elapsedMs)
+          : 'unknown';
+        console.log(`Session ended: ${session.project || id} (was running ${duration})`);
 
         this.emit('session-ended', {
           ...session,
@@ -293,12 +450,13 @@ class SessionMonitor extends EventEmitter {
 
   getSessions() {
     return Array.from(this.sessions.values()).map(s => ({
+      id: s.id,
       pid: s.pid,
       tty: s.tty,
       cwd: s.cwd,
       project: s.project,
       startedAt: s.startedAt,
-      elapsed: this.formatDuration(s.elapsedMs),
+      elapsed: s.elapsedMs > 0 ? this.formatDuration(s.elapsedMs) : 'active',
       elapsedMs: s.elapsedMs,
       busy: s.busy,
       cpuDelta: s.cpuDelta,
@@ -306,7 +464,7 @@ class SessionMonitor extends EventEmitter {
   }
 
   start() {
-    console.log(`Session monitor started (polling every ${this.pollIntervalMs / 1000}s)`);
+    console.log(`Session monitor started (polling every ${this.pollIntervalMs / 1000}s, hybrid debug-file + process detection)`);
     this.poll();
     this.pollTimer = setInterval(() => this.poll(), this.pollIntervalMs);
   }
