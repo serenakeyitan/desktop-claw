@@ -14,6 +14,10 @@
  * 3. FALLBACK: If no debug files are found, falls back to pure process
  *    scanning (legacy approach).
  *
+ * 4. SSH DETECTION: Scans for outgoing SSH connections to detect Claude
+ *    Code sessions running on remote machines (same account, shared API key).
+ *    These appear as "remote" sessions with the SSH host as the project name.
+ *
  * The debug-file approach is more accurate than process scanning because:
  * - No process name ambiguity (claude vs node vs npx)
  * - Works regardless of how Claude was launched
@@ -227,6 +231,81 @@ class SessionMonitor extends EventEmitter {
   }
 
   /**
+   * SSH DETECTION: Scan for outgoing SSH connections.
+   *
+   * Detects SSH sessions from this machine to remote hosts where Claude Code
+   * may be running with the same API key/account. These appear as "remote"
+   * sessions since we can't inspect the remote process directly.
+   *
+   * Returns array of { id, pid, host, user, elapsed, elapsedMs }.
+   */
+  scanSSHSessions() {
+    const sessions = [];
+
+    try {
+      // Find outgoing ssh processes (interactive sessions, not scp/sftp/tunnels)
+      const raw = execSync(
+        `ps -eo pid,tty,etime,args 2>/dev/null | grep -E "^\\s*[0-9]+\\s+\\S+\\s+\\S+\\s+ssh\\s+" | grep -v grep | grep -v -- "-N" | grep -v -- "-L" | grep -v -- "-R" | grep -v -- "-D"`,
+        { encoding: 'utf8', timeout: 5000 }
+      ).trim();
+      if (!raw) return sessions;
+
+      for (const line of raw.split('\n')) {
+        const parts = line.trim().split(/\s+/);
+        if (parts.length < 4) continue;
+
+        const pid = parseInt(parts[0], 10);
+        if (isNaN(pid)) continue;
+
+        const tty = parts[1] === '??' ? null : parts[1];
+        const elapsed = parts[2];
+        const elapsedMs = this.parseElapsed(elapsed);
+
+        // Parse the ssh args to extract user@host or just host
+        const sshArgs = parts.slice(3); // ["ssh", "user@host", ...]
+        if (sshArgs[0] !== 'ssh') continue;
+
+        // Find the destination (skip flags like -p, -i, etc.)
+        let destination = null;
+        for (let i = 1; i < sshArgs.length; i++) {
+          const arg = sshArgs[i];
+          // Skip flags that take a value
+          if (/^-[bcDeFIiJLlmOopQRSWw]$/.test(arg)) {
+            i++; // skip the value too
+            continue;
+          }
+          // Skip boolean flags
+          if (arg.startsWith('-')) continue;
+          // This should be the destination
+          destination = arg;
+          break;
+        }
+
+        if (!destination) continue;
+
+        // Parse user@host
+        let user = null;
+        let host = destination;
+        if (destination.includes('@')) {
+          [user, host] = destination.split('@', 2);
+        }
+
+        sessions.push({
+          id: `ssh-${host}-${pid}`,
+          pid,
+          tty,
+          host,
+          user,
+          elapsed,
+          elapsedMs,
+        });
+      }
+    } catch { /* no SSH sessions */ }
+
+    return sessions;
+  }
+
+  /**
    * Parse ps elapsed time format to milliseconds.
    */
   parseElapsed(elapsed) {
@@ -267,15 +346,17 @@ class SessionMonitor extends EventEmitter {
   /**
    * Poll once: detect sessions, track CPU time deltas, emit events.
    *
-   * Uses UNION approach — merges two sources to catch all sessions:
+   * Uses UNION approach — merges three sources to catch all sessions:
    * 1. Debug files with fresh mtime → active sessions (best project info)
    * 2. Process scanning → catches idle sessions with stale debug files
+   * 3. SSH connections → detects remote sessions on other machines
    *
-   * Sessions are deduplicated by cwd to avoid double-counting.
+   * Sessions are deduplicated by cwd/host to avoid double-counting.
    */
   poll() {
     const debugSessions = this.scanDebugFiles();
     const processes = this.scanProcesses();
+    const sshSessions = this.scanSSHSessions();
 
     // Build union of sessions, keyed by cwd (or fallback to id)
     const sessionMap = new Map(); // cwd -> session info
@@ -294,6 +375,7 @@ class SessionMonitor extends EventEmitter {
         elapsed: null,
         elapsedMs: 0,
         cpuTimeSec: 0,
+        remote: false,
       });
     }
 
@@ -321,6 +403,28 @@ class SessionMonitor extends EventEmitter {
           elapsed: proc.elapsed,
           elapsedMs: proc.elapsedMs,
           cpuTimeSec: proc.cpuTimeSec,
+          remote: false,
+        });
+      }
+    }
+
+    // Finally, add SSH remote sessions (always separate — different machines)
+    for (const ssh of sshSessions) {
+      const key = `ssh-${ssh.host}`;
+      if (!sessionMap.has(key)) {
+        const label = ssh.user ? `${ssh.user}@${ssh.host}` : ssh.host;
+        sessionMap.set(key, {
+          id: ssh.id,
+          cwd: null,
+          project: `remote:${label}`,
+          mtime: null,
+          ageMs: null,
+          pid: ssh.pid,
+          tty: ssh.tty,
+          elapsed: ssh.elapsed,
+          elapsedMs: ssh.elapsedMs,
+          cpuTimeSec: 0, // can't track remote CPU
+          remote: true,
         });
       }
     }
@@ -338,15 +442,16 @@ class SessionMonitor extends EventEmitter {
           tty: sess.tty,
           cwd: sess.cwd,
           project: sess.project,
+          remote: sess.remote || false,
           startedAt: sess.elapsedMs > 0
             ? new Date(Date.now() - sess.elapsedMs)
             : new Date(),
           elapsedMs: sess.elapsedMs,
           lastCpuTimeSec: sess.cpuTimeSec,
           cpuDelta: 0,
-          busy: false,
+          busy: sess.remote ? true : false, // remote sessions assumed busy
           idlePolls: 0,
-          busySince: null,
+          busySince: sess.remote ? new Date() : null,
         };
         this.sessions.set(sess.id, session);
 
@@ -364,7 +469,8 @@ class SessionMonitor extends EventEmitter {
         if (sess.pid) existing.pid = sess.pid;
 
         // CPU time delta for busy/idle detection (only if we have process info)
-        if (sess.cpuTimeSec > 0) {
+        // Skip for remote sessions — we can't track their CPU usage
+        if (sess.cpuTimeSec > 0 && !existing.remote) {
           const cpuDelta = sess.cpuTimeSec - existing.lastCpuTimeSec;
           existing.lastCpuTimeSec = sess.cpuTimeSec;
           existing.cpuDelta = cpuDelta;
@@ -455,6 +561,7 @@ class SessionMonitor extends EventEmitter {
       tty: s.tty,
       cwd: s.cwd,
       project: s.project,
+      remote: s.remote || false,
       startedAt: s.startedAt,
       elapsed: s.elapsedMs > 0 ? this.formatDuration(s.elapsedMs) : 'active',
       elapsedMs: s.elapsedMs,
@@ -464,7 +571,7 @@ class SessionMonitor extends EventEmitter {
   }
 
   start() {
-    console.log(`Session monitor started (polling every ${this.pollIntervalMs / 1000}s, hybrid debug-file + process detection)`);
+    console.log(`Session monitor started (polling every ${this.pollIntervalMs / 1000}s, hybrid debug-file + process + SSH detection)`);
     this.poll();
     this.pollTimer = setInterval(() => this.poll(), this.pollIntervalMs);
   }
