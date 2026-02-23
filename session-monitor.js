@@ -57,59 +57,86 @@ class SessionMonitor extends EventEmitter {
    * Returns an array of { pid, tty, elapsed, cpuTimeSec, cwd, ... } objects.
    */
   scanProcesses() {
+    const seenPids = new Set();
+    const processes = [];
+
+    // Strategy 1: Match processes with comm == "claude" (standard install)
     try {
-      // ps -eo: PID TTY ELAPSED CPUTIME COMMAND
       const raw = execSync(
         `ps -eo pid,tty,etime,cputime,comm | grep -w "claude$" | grep -v grep`,
         { encoding: 'utf8', timeout: 5000 }
       ).trim();
 
-      if (!raw) return [];
-
-      const processes = [];
-
-      for (const line of raw.split('\n')) {
-        const parts = line.trim().split(/\s+/);
-        if (parts.length < 5) continue;
-
-        const pid = parseInt(parts[0], 10);
-        const tty = parts[1];
-        const elapsed = parts[2]; // [[DD-]HH:]MM:SS
-        const cputime = parts[3]; // MM:SS.xx or HH:MM:SS
-        const comm = parts.slice(4).join(' ');
-
-        if (!comm.endsWith('claude')) continue;
-        if (isNaN(pid)) continue;
-
-        // Get working directory via lsof
-        let cwd = null;
-        try {
-          const lsofOut = execSync(
-            `lsof -a -d cwd -p ${pid} -Fn 2>/dev/null | grep "^n/"`,
-            { encoding: 'utf8', timeout: 3000 }
-          ).trim();
-          if (lsofOut) {
-            cwd = lsofOut.replace(/^n/, '');
-          }
-        } catch {
-          // lsof might fail for some processes
+      if (raw) {
+        for (const line of raw.split('\n')) {
+          const parts = line.trim().split(/\s+/);
+          if (parts.length < 5) continue;
+          const pid = parseInt(parts[0], 10);
+          if (isNaN(pid) || seenPids.has(pid)) continue;
+          const comm = parts.slice(4).join(' ');
+          if (!comm.endsWith('claude')) continue;
+          seenPids.add(pid);
+          this._addProcess(processes, pid, parts[1], parts[2], parts[3]);
         }
-
-        processes.push({
-          pid,
-          tty: tty === '??' ? null : tty,
-          elapsed,
-          elapsedMs: this.parseElapsed(elapsed),
-          cpuTimeSec: this.parseCpuTime(cputime),
-          cwd,
-          project: cwd ? path.basename(cwd) : null,
-        });
       }
+    } catch { /* no matches */ }
 
-      return processes;
+    // Strategy 2: Match node processes running claude-code CLI
+    // Catches sessions where comm is "node" instead of "claude"
+    // (e.g. npx claude, or newer Claude Code versions)
+    try {
+      const raw2 = execSync(
+        `ps -eo pid,tty,etime,cputime,args | grep -E "claude-code|/bin/claude" | grep -v grep`,
+        { encoding: 'utf8', timeout: 5000 }
+      ).trim();
+
+      if (raw2) {
+        for (const line of raw2.split('\n')) {
+          const parts = line.trim().split(/\s+/);
+          if (parts.length < 5) continue;
+          const pid = parseInt(parts[0], 10);
+          if (isNaN(pid) || seenPids.has(pid)) continue;
+
+          const args = parts.slice(4).join(' ');
+          // Exclude helper processes (Electron, expect scripts, shell snapshots, zsh wrappers)
+          if (args.includes('Electron') || args.includes('expect') ||
+              args.includes('shell-snapshot') || args.includes('get-claude-usage') ||
+              args.includes('/bin/zsh')) continue;
+          seenPids.add(pid);
+          this._addProcess(processes, pid, parts[1], parts[2], parts[3]);
+        }
+      }
+    } catch { /* no matches */ }
+
+    return processes;
+  }
+
+  /**
+   * Helper: enrich a detected process with cwd/project info and add to array.
+   */
+  _addProcess(processes, pid, tty, elapsed, cputime) {
+    let cwd = null;
+    try {
+      const lsofOut = execSync(
+        `lsof -a -d cwd -p ${pid} -Fn 2>/dev/null | grep "^n/"`,
+        { encoding: 'utf8', timeout: 3000 }
+      ).trim();
+      if (lsofOut) {
+        cwd = lsofOut.replace(/^n/, '');
+      }
     } catch {
-      return [];
+      // lsof might fail for some processes
     }
+
+    processes.push({
+      pid,
+      tty: tty === '??' ? null : tty,
+      elapsed,
+      elapsedMs: this.parseElapsed(elapsed),
+      cpuTimeSec: this.parseCpuTime(cputime),
+      cwd,
+      project: cwd ? path.basename(cwd) : null,
+    });
   }
 
   /**
