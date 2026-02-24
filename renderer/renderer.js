@@ -39,6 +39,12 @@ function setupEventListeners() {
   document.addEventListener('mousemove', handleDragMove);
   document.addEventListener('mouseup', handleDragEnd);
 
+  // Resize handle
+  const resizeHandle = document.getElementById('resize-handle');
+  if (resizeHandle) {
+    resizeHandle.addEventListener('mousedown', handleResizeStart);
+  }
+
   // Context menu
   document.addEventListener('contextmenu', (e) => {
     e.preventDefault();
@@ -68,7 +74,7 @@ function handleDragStart(e) {
 }
 
 function handleDragMove(e) {
-  if (!isDragging) return;
+  if (!isDragging || isResizing) return;
 
   const deltaX = e.screenX - dragStartX;
   const deltaY = e.screenY - dragStartY;
@@ -84,6 +90,49 @@ function handleDragEnd(e) {
 
   isDragging = false;
   document.body.classList.remove('dragging');
+}
+
+// ── Resize handling ──
+let isResizing = false;
+let resizeStartX = 0;
+let resizeStartY = 0;
+let resizeStartW = 0;
+let resizeStartH = 0;
+
+function handleResizeStart(e) {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  e.stopPropagation();
+
+  isResizing = true;
+  resizeStartX = e.screenX;
+  resizeStartY = e.screenY;
+  resizeStartW = window.innerWidth;
+  resizeStartH = window.innerHeight;
+
+  document.addEventListener('mousemove', handleResizeMove);
+  document.addEventListener('mouseup', handleResizeEnd);
+}
+
+function handleResizeMove(e) {
+  if (!isResizing) return;
+
+  const deltaX = e.screenX - resizeStartX;
+  const deltaY = e.screenY - resizeStartY;
+
+  // Maintain aspect ratio (roughly 5:6 width:height)
+  const delta = Math.max(deltaX, deltaY);
+  const newW = resizeStartW + delta;
+  const newH = resizeStartH + Math.round(delta * 1.2);
+
+  window.electronAPI.setWindowSize({ width: newW, height: newH });
+}
+
+function handleResizeEnd(e) {
+  if (!isResizing) return;
+  isResizing = false;
+  document.removeEventListener('mousemove', handleResizeMove);
+  document.removeEventListener('mouseup', handleResizeEnd);
 }
 
 function setupIPC() {

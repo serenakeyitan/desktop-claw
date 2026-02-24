@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Window management
   setWindowPosition: (position) => ipcRenderer.invoke('set-window-position', position),
+  setWindowSize: (size) => ipcRenderer.invoke('set-window-size', size),
   showContextMenu: () => ipcRenderer.invoke('show-context-menu'),
 
   // App control

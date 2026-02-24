@@ -80,6 +80,7 @@ const DEFAULT_CONFIG = {
   proxy_port: 9999,
   detection_method: 'auto',
   position: { x: null, y: null },
+  window_size: { width: 100, height: 120 },
   window_locked: false
 };
 
@@ -182,8 +183,9 @@ function createMainWindow() {
   const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
 
   // Calculate default position (bottom-right with 20px margin)
-  const windowWidth = 180;
-  const windowHeight = 200;
+  const savedSize = config.window_size || DEFAULT_CONFIG.window_size;
+  const windowWidth = savedSize.width;
+  const windowHeight = savedSize.height;
   let x = config.position.x !== null ? config.position.x : screenWidth - windowWidth - 20;
   let y = config.position.y !== null ? config.position.y : screenHeight - windowHeight - 20;
 
@@ -194,13 +196,17 @@ function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: windowWidth,
     height: windowHeight,
+    minWidth: 60,
+    minHeight: 72,
+    maxWidth: 240,
+    maxHeight: 280,
     x: x,
     y: y,
     transparent: true,
     frame: false,
     alwaysOnTop: true,
     skipTaskbar: true,
-    resizable: false,
+    resizable: true,
     minimizable: false,
     maximizable: false,
     hasShadow: false,
@@ -235,6 +241,17 @@ function createMainWindow() {
       const [x, y] = mainWindow.getPosition();
       config.position = { x, y };
       saveConfig(config);
+    }
+  });
+
+  // Save size on resize
+  mainWindow.on('resize', () => {
+    if (mainWindow) {
+      const [w, h] = mainWindow.getSize();
+      config.window_size = { width: w, height: h };
+      saveConfig(config);
+      // Notify renderer so it can scale contents
+      mainWindow.webContents.send('window-resized', { width: w, height: h });
     }
   });
 }
@@ -1263,5 +1280,14 @@ ipcMain.handle('set-window-position', (event, { x, y }) => {
     if (!config.window_locked) {
       mainWindow.setPosition(Math.round(x), Math.round(y));
     }
+  }
+});
+
+// Handle resize from renderer
+ipcMain.handle('set-window-size', (event, { width, height }) => {
+  if (mainWindow) {
+    const w = Math.max(60, Math.min(240, Math.round(width)));
+    const h = Math.max(72, Math.min(280, Math.round(height)));
+    mainWindow.setSize(w, h);
   }
 });
