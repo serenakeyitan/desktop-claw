@@ -80,7 +80,7 @@ const DEFAULT_CONFIG = {
   proxy_port: 9999,
   detection_method: 'auto',
   position: { x: null, y: null },
-  window_size: { width: 100, height: 120 },
+  window_size: { width: 120, height: 140 },
   window_locked: false
 };
 
