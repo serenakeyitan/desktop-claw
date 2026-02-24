@@ -18,13 +18,13 @@ body {
 
 /* Widget Container */
 #widget-container {
-  width: 100%;
-  height: 100vh;
+  width: 180px;
+  height: 200px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  padding: 6px;
+  padding: 10px;
   position: relative;
   -webkit-app-region: drag;
 }
@@ -211,32 +211,25 @@ body {
 
 /* ── Robot Container ── */
 #robot-container {
-  width: 100%;
-  flex: 1;
+  width: 96px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   -webkit-app-region: no-drag;
   cursor: pointer;
-  overflow: hidden;
+  transform-origin: center bottom;
+  transition: transform 0.1s ease;
 }
 
-/* Scale the SVG to fill the container */
-#robot-container .pixel-robot {
-  width: 100%;
-  height: 100%;
-  max-width: 100%;
-  max-height: 100%;
-}
-
-/* ── Resize Handle ── */
+/* ── Resize Handle (bottom-right of robot) ── */
 #resize-handle {
-  position: fixed;
-  bottom: 0;
-  right: 0;
-  width: 14px;
-  height: 14px;
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
   cursor: nwse-resize;
   -webkit-app-region: no-drag;
   z-index: 50;
@@ -249,13 +242,13 @@ body {
   position: absolute;
   bottom: 2px;
   right: 2px;
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-right: 2px solid #555;
   border-bottom: 2px solid #555;
 }
 
-#widget-container:hover #resize-handle {
+#robot-container:hover #resize-handle {
   opacity: 1;
 }
 

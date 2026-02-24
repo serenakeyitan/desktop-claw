@@ -80,7 +80,7 @@ const DEFAULT_CONFIG = {
   proxy_port: 9999,
   detection_method: 'auto',
   position: { x: null, y: null },
-  window_size: { width: 120, height: 140 },
+  robot_scale: 0.6,
   window_locked: false
 };
 
@@ -183,9 +183,8 @@ function createMainWindow() {
   const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
 
   // Calculate default position (bottom-right with 20px margin)
-  const savedSize = config.window_size || DEFAULT_CONFIG.window_size;
-  const windowWidth = savedSize.width;
-  const windowHeight = savedSize.height;
+  const windowWidth = 180;
+  const windowHeight = 200;
   let x = config.position.x !== null ? config.position.x : screenWidth - windowWidth - 20;
   let y = config.position.y !== null ? config.position.y : screenHeight - windowHeight - 20;
 
@@ -196,17 +195,13 @@ function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: windowWidth,
     height: windowHeight,
-    minWidth: 60,
-    minHeight: 60,
-    maxWidth: 300,
-    maxHeight: 300,
     x: x,
     y: y,
     transparent: true,
     frame: false,
     alwaysOnTop: true,
     skipTaskbar: true,
-    resizable: true,
+    resizable: false,
     minimizable: false,
     maximizable: false,
     hasShadow: false,
@@ -244,16 +239,6 @@ function createMainWindow() {
     }
   });
 
-  // Save size on resize
-  mainWindow.on('resize', () => {
-    if (mainWindow) {
-      const [w, h] = mainWindow.getSize();
-      config.window_size = { width: w, height: h };
-      saveConfig(config);
-      // Notify renderer so it can scale contents
-      mainWindow.webContents.send('window-resized', { width: w, height: h });
-    }
-  });
 }
 
 // Check for manual usage file
@@ -1283,11 +1268,9 @@ ipcMain.handle('set-window-position', (event, { x, y }) => {
   }
 });
 
-// Handle resize from renderer
-ipcMain.handle('set-window-size', (event, { width, height }) => {
-  if (mainWindow) {
-    const w = Math.max(60, Math.min(300, Math.round(width)));
-    const h = Math.max(60, Math.min(300, Math.round(height)));
-    mainWindow.setSize(w, h);
-  }
+// Save robot scale from renderer
+ipcMain.handle('save-robot-scale', (event, scale) => {
+  const config = loadConfig();
+  config.robot_scale = Math.max(0.3, Math.min(1.5, scale));
+  saveConfig(config);
 });

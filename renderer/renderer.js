@@ -15,9 +15,21 @@ document.addEventListener('DOMContentLoaded', () => {
   setupIPC();
 });
 
-function initializeRobot() {
+async function initializeRobot() {
   const container = document.getElementById('robot-container');
   robot = new PixelRobot(container);
+
+  // Load saved robot scale from config
+  try {
+    const config = await window.electronAPI.getConfig();
+    if (config && typeof config.robot_scale === 'number') {
+      applyRobotScale(config.robot_scale);
+    } else {
+      applyRobotScale(0.6);
+    }
+  } catch (e) {
+    applyRobotScale(0.6);
+  }
 
   // Set up blinking interval for idle state
   setInterval(() => {
@@ -92,12 +104,19 @@ function handleDragEnd(e) {
   document.body.classList.remove('dragging');
 }
 
-// ── Resize handling ──
+// ── Robot scale handling ──
 let isResizing = false;
-let resizeStartX = 0;
 let resizeStartY = 0;
-let resizeStartW = 0;
-let resizeStartH = 0;
+let resizeStartScale = 1;
+let robotScale = 0.6; // default, overridden by config on load
+
+function applyRobotScale(scale) {
+  robotScale = Math.max(0.3, Math.min(1.5, scale));
+  const container = document.getElementById('robot-container');
+  if (container) {
+    container.style.transform = `scale(${robotScale})`;
+  }
+}
 
 function handleResizeStart(e) {
   if (e.button !== 0) return;
@@ -105,10 +124,8 @@ function handleResizeStart(e) {
   e.stopPropagation();
 
   isResizing = true;
-  resizeStartX = e.screenX;
   resizeStartY = e.screenY;
-  resizeStartW = window.innerWidth;
-  resizeStartH = window.innerHeight;
+  resizeStartScale = robotScale;
 
   document.addEventListener('mousemove', handleResizeMove);
   document.addEventListener('mouseup', handleResizeEnd);
@@ -117,13 +134,10 @@ function handleResizeStart(e) {
 function handleResizeMove(e) {
   if (!isResizing) return;
 
-  const deltaX = e.screenX - resizeStartX;
+  // Drag down = bigger, drag up = smaller
   const deltaY = e.screenY - resizeStartY;
-
-  const newW = resizeStartW + deltaX;
-  const newH = resizeStartH + deltaY;
-
-  window.electronAPI.setWindowSize({ width: newW, height: newH });
+  const newScale = resizeStartScale + deltaY * 0.005;
+  applyRobotScale(newScale);
 }
 
 function handleResizeEnd(e) {
@@ -131,6 +145,8 @@ function handleResizeEnd(e) {
   isResizing = false;
   document.removeEventListener('mousemove', handleResizeMove);
   document.removeEventListener('mouseup', handleResizeEnd);
+  // Persist
+  window.electronAPI.saveRobotScale(robotScale);
 }
 
 function setupIPC() {

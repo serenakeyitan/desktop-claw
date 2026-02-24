@@ -21,8 +21,10 @@ class PixelRobot {
   }
 
   createRobot() {
-    // Create main SVG — use viewBox for scaling, no fixed width/height
+    // Create main SVG
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', this.gridWidth * this.pixelSize);
+    svg.setAttribute('height', this.gridHeight * this.pixelSize);
     svg.setAttribute('viewBox', `0 0 ${this.gridWidth * this.pixelSize} ${this.gridHeight * this.pixelSize}`);
     svg.classList.add('pixel-robot');
 
