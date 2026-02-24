@@ -116,6 +116,14 @@ function applyRobotScale(scale) {
   if (container) {
     container.style.transform = `scale(${robotScale})`;
   }
+  // Keep bubble sitting just above the visible robot
+  // Robot container is 64px tall, transform-origin is center bottom
+  // so visible top = bottom + (64 * scale). Add padding (10) + gap (6).
+  const bubble = document.getElementById('bubble');
+  if (bubble) {
+    const visibleHeight = 64 * robotScale;
+    bubble.style.bottom = `${visibleHeight + 16}px`;
+  }
 }
 
 function handleResizeStart(e) {
