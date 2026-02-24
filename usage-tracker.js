@@ -7,7 +7,7 @@ const os = require('os');
 class UsageTracker extends EventEmitter {
   constructor() {
     super();
-    this.dataFile = path.join(os.homedir(), '.openclaw-pet', 'usage-data.json');
+    this.dataFile = path.join(os.homedir(), '.alldaypoke', 'usage-data.json');
     this.usage = this.loadUsage();
     this.resetIfNeeded();
   }

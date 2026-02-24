@@ -28,8 +28,8 @@ function print(message, color = '') {
 }
 
 function printHelp() {
-  print('\n🤖 OpenClaw Pet - OpenAI Usage Tracker\n', colors.bright + colors.cyan);
-  print('Usage: openclaw <command> [options]\n', colors.bright);
+  print('\n🤖 All Day Poke - Usage Tracker\n', colors.bright + colors.cyan);
+  print('Usage: alldaypoke <command> [options]\n', colors.bright);
 
   print('Commands:', colors.yellow);
   print('  setup-token        Configure OpenAI authentication', colors.cyan);
@@ -40,17 +40,17 @@ function printHelp() {
   print('  help               Show this help message\n', colors.cyan);
 
   print('Setup Options:', colors.yellow);
-  print('  openclaw setup-token                Interactive setup', colors.cyan);
-  print('  openclaw setup-token --api-key <key>  Set API key directly', colors.cyan);
-  print('  openclaw setup-token --oauth          Configure OAuth', colors.cyan);
-  print('  openclaw setup-token --test           Test authentication', colors.cyan);
-  print('  openclaw setup-token --clear          Clear saved credentials\n', colors.cyan);
+  print('  alldaypoke setup-token                Interactive setup', colors.cyan);
+  print('  alldaypoke setup-token --api-key <key>  Set API key directly', colors.cyan);
+  print('  alldaypoke setup-token --oauth          Configure OAuth', colors.cyan);
+  print('  alldaypoke setup-token --test           Test authentication', colors.cyan);
+  print('  alldaypoke setup-token --clear          Clear saved credentials\n', colors.cyan);
 
   print('Examples:', colors.yellow);
-  print('  openclaw setup-token                  # Interactive setup', colors.green);
-  print('  openclaw setup-token --api-key sk-... # Quick API key setup', colors.green);
-  print('  openclaw test                          # Test integration', colors.green);
-  print('  openclaw start                         # Run the app\n', colors.green);
+  print('  alldaypoke setup-token                  # Interactive setup', colors.green);
+  print('  alldaypoke setup-token --api-key sk-... # Quick API key setup', colors.green);
+  print('  alldaypoke test                          # Test integration', colors.green);
+  print('  alldaypoke start                         # Run the app\n', colors.green);
 }
 
 function runCommand(scriptFile, args = []) {
@@ -116,6 +116,6 @@ if (commands[command]) {
   }
 } else {
   print(`❌ Unknown command: ${command}`, colors.red);
-  print('Run "openclaw help" for available commands', colors.yellow);
+  print('Run "alldaypoke help" for available commands', colors.yellow);
   process.exit(1);
 }

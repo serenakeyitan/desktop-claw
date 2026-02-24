@@ -8,7 +8,7 @@ const { execSync } = require('child_process');
 const crypto = require('crypto');
 
 // Configuration paths
-const CONFIG_DIR = path.join(os.homedir(), '.openclaw-pet');
+const CONFIG_DIR = path.join(os.homedir(), '.alldaypoke');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 const TOKEN_FILE = path.join(CONFIG_DIR, 'openai-token.json');
 
@@ -37,7 +37,7 @@ function printHeader() {
   console.clear();
   print('╔════════════════════════════════════════╗', colors.cyan);
   print('║                                        ║', colors.cyan);
-  print('║       OpenClaw Pet - Setup Token       ║', colors.cyan);
+  print('║       All Day Poke - Setup Token       ║', colors.cyan);
   print('║         OpenAI Usage Tracker           ║', colors.cyan);
   print('║                                        ║', colors.cyan);
   print('╚════════════════════════════════════════╝', colors.cyan);
@@ -207,7 +207,7 @@ async function checkExistingSetup() {
   let hasAuth = false;
 
   if (config.authType === 'openai-subscription') {
-    const sessionFile = path.join(os.homedir(), '.openclaw-pet', 'openai-session.json');
+    const sessionFile = path.join(os.homedir(), '.alldaypoke', 'openai-session.json');
     if (fs.existsSync(sessionFile)) {
       print('✅ Found ChatGPT Plus session', colors.green);
       hasAuth = true;
@@ -258,7 +258,7 @@ async function main() {
 
   if (args.length > 0) {
     if (args[0] === '--help' || args[0] === '-h') {
-      print('Usage: openclaw setup-token [options]\n', colors.bright);
+      print('Usage: alldaypoke setup-token [options]\n', colors.bright);
       print('Options:', colors.yellow);
       print('  --test             Test current ChatGPT session', colors.cyan);
       print('  --clear            Clear saved ChatGPT session', colors.cyan);
@@ -275,7 +275,7 @@ async function main() {
       saveConfig(config);
 
       // Clear session file
-      const sessionFile = path.join(os.homedir(), '.openclaw-pet', 'openai-session.json');
+      const sessionFile = path.join(os.homedir(), '.alldaypoke', 'openai-session.json');
       if (fs.existsSync(sessionFile)) {
         fs.unlinkSync(sessionFile);
       }
@@ -301,7 +301,7 @@ async function main() {
     return;
   }
 
-  print('\n🎯 OpenClaw tracks ChatGPT Plus usage (GPT-4 limits)', colors.bright);
+  print('\n🎯 All Day Poke tracks ChatGPT Plus usage (GPT-4 limits)', colors.bright);
   print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', colors.cyan);
   print('\nChatGPT Plus includes:', colors.yellow);
   print('• 80 messages every 3 hours with GPT-4', colors.green);
@@ -317,7 +317,7 @@ async function main() {
   } else {
     print('\n👋 Setup cancelled', colors.yellow);
     print('You can run setup again anytime with:', colors.cyan);
-    print('  openclaw setup-token', colors.bright + colors.cyan);
+    print('  alldaypoke setup-token', colors.bright + colors.cyan);
   }
 
   if (success) {

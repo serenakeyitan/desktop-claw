@@ -1,4 +1,4 @@
--- OpenClaw Social Ranking Schema for Supabase
+-- All Day Poke Social Ranking Schema for Supabase
 -- Run this in the Supabase SQL Editor (Dashboard > SQL Editor > New Query)
 
 -- 1. Profiles table (extends Supabase auth.users)

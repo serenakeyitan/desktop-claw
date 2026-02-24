@@ -33,7 +33,7 @@ class ClaudeAuth extends EventEmitter {
             type: 'info',
             title: 'Already Logged In',
             message: 'You are already logged into Claude!',
-            detail: 'OpenClaw Pet has connected to your existing Claude session. The app will now start tracking your usage.',
+            detail: 'All Day Poke has connected to your existing Claude session. The app will now start tracking your usage.',
             buttons: ['Great!']
           });
 
@@ -97,7 +97,7 @@ class ClaudeAuth extends EventEmitter {
               <div class="container">
                 <div class="check">✅</div>
                 <h1>Successfully Connected!</h1>
-                <p>OpenClaw Pet is now connected to your Claude account.</p>
+                <p>All Day Poke is now connected to your Claude account.</p>
                 <p>You can close this window and return to the application.</p>
                 <script>
                   // Auto-close after 3 seconds

@@ -18,7 +18,7 @@ class ClaudeUsageFetcher extends EventEmitter {
     this.fetchPromise = null;
     this.startPromise = null;
     this.maxBufferLength = 10000;
-    this.usageFile = path.join(os.homedir(), '.openclaw-pet', 'real-usage.json');
+    this.usageFile = path.join(os.homedir(), '.alldaypoke', 'real-usage.json');
     this.claudeBinary = null;
   }
 

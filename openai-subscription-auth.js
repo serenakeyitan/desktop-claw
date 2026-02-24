@@ -10,7 +10,7 @@ class OpenAISubscriptionAuth extends EventEmitter {
     this.authWindow = null;
     this.sessionCookies = null;
     this.sessionToken = null;
-    this.cookieFile = path.join(os.homedir(), '.openclaw-pet', 'openai-session.json');
+    this.cookieFile = path.join(os.homedir(), '.alldaypoke', 'openai-session.json');
     this.usageLimit = 80; // GPT-4 has ~80 messages per 3 hours for Plus
     this.currentUsage = 0;
     this.resetTime = null;

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Manual usage updater for OpenClaw Pet
+ * Manual usage updater for All Day Poke
  * Run this script with the usage percentage from Claude Code's /usage command
  * Usage: node manual-usage-update.js <percentage>
  * Example: node manual-usage-update.js 45
@@ -11,7 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const usageFile = path.join(os.homedir(), '.openclaw-pet', 'real-usage.json');
+const usageFile = path.join(os.homedir(), '.alldaypoke', 'real-usage.json');
 
 // Get usage percentage from command line
 const percentage = parseInt(process.argv[2]);
@@ -51,4 +51,4 @@ fs.writeFileSync(usageFile, JSON.stringify(usageData, null, 2));
 console.log(`✅ Usage updated to ${percentage}%`);
 console.log(`📁 Saved to: ${usageFile}`);
 console.log(`⏰ Reset at: ${resetAt.toLocaleString()}`);
-console.log('\nThe OpenClaw Pet will now show this real usage data!');
+console.log('\nThe All Day Poke will now show this real usage data!');

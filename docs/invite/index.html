@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OpenClaw — Friend Invite</title>
+  <title>All Day Poke — Friend Invite</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -193,12 +193,12 @@
 <body>
   <div class="container">
     <div class="logo">&#x1F980;</div>
-    <div class="title">OPENCLAW</div>
+    <div class="title">ALL DAY POKE</div>
     <div class="subtitle">CLAUDE USAGE TRACKER</div>
 
     <!-- Phase 1: Trying to open the app -->
     <div id="status-opening">
-      Opening OpenClaw<span class="dots"></span>
+      Opening All Day Poke<span class="dots"></span>
     </div>
 
     <!-- Phase 2: App not installed — show setup guide -->
@@ -208,7 +208,7 @@
       <div class="invite-code" id="code-display">--------</div>
 
       <div class="section">
-        <a id="open-app-link" href="#" class="open-btn">OPEN IN OPENCLAW</a>
+        <a id="open-app-link" href="#" class="open-btn">OPEN IN ALL DAY POKE</a>
         <div class="open-hint">Already have the app installed?</div>
       </div>
 
@@ -249,7 +249,7 @@
       </div>
     </div>
 
-    <div class="footer">OPENCLAW DESKTOP PET</div>
+    <div class="footer">ALL DAY POKE DESKTOP PET</div>
   </div>
 
   <script>
@@ -265,7 +265,7 @@
       document.getElementById('code-copy').textContent = code;
 
       // Build the deep link
-      const deepLink = `openclaw://invite/${code}`;
+      const deepLink = `alldaypoke://invite/${code}`;
       document.getElementById('open-app-link').href = deepLink;
 
       // Try to open the app via deep link

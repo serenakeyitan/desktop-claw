@@ -1,8 +1,8 @@
-# 🤖 OpenClaw Desktop Pet
+# 🤖 All Day Poke Desktop Pet
 
 A minimalist desktop widget that floats over all windows, showing real-time Claude API token usage with an animated pixel-art robot that reacts to API activity.
 
-![OpenClaw Pet](claude-code.png)
+![All Day Poke](claude-code.png)
 
 ## ✨ Features
 
@@ -78,8 +78,8 @@ Then restart your terminal and Claude Code will route through the proxy.
 ### Config File Location
 
 The config file is automatically created at:
-- macOS/Linux: `~/.openclaw-pet/config.json`
-- Windows: `%USERPROFILE%\.openclaw-pet\config.json`
+- macOS/Linux: `~/.alldaypoke/config.json`
+- Windows: `%USERPROFILE%\.alldaypoke\config.json`
 
 ### Config Options
 

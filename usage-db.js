@@ -13,7 +13,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const DB_FILE = path.join(os.homedir(), '.openclaw-pet', 'usage-history.json');
+const DB_FILE = path.join(os.homedir(), '.alldaypoke', 'usage-history.json');
 const COMPACT_AFTER_DAYS = 30;
 
 class UsageDB {

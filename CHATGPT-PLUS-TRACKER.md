@@ -25,7 +25,7 @@ This is a desktop pet application that tracks your **ChatGPT Plus subscription u
 npm install
 
 # Run setup command
-openclaw setup-token
+alldaypoke setup-token
 
 # Or directly start the app
 npm start
@@ -53,7 +53,7 @@ The pet will appear on your desktop showing:
 
 ### Usage Tracking
 - **3-Hour Windows**: Tracks messages in rolling 3-hour periods
-- **Local Storage**: Usage data saved in `~/.openclaw-pet/openai-session.json`
+- **Local Storage**: Usage data saved in `~/.alldaypoke/openai-session.json`
 - **Automatic Reset**: Clears count after 3-hour window expires
 
 ### Message Detection
@@ -65,16 +65,16 @@ The pet will appear on your desktop showing:
 
 ```bash
 # Interactive setup
-openclaw setup-token
+alldaypoke setup-token
 
 # Test current session
-openclaw setup-token --test
+alldaypoke setup-token --test
 
 # Clear saved session
-openclaw setup-token --clear
+alldaypoke setup-token --clear
 
 # Start the application
-openclaw start
+alldaypoke start
 ```
 
 ## File Structure
@@ -86,8 +86,8 @@ openclaw start
 - `renderer/setup.html` - Setup UI for ChatGPT login
 
 ### Configuration
-- Config: `~/.openclaw-pet/config.json`
-- Session: `~/.openclaw-pet/openai-session.json`
+- Config: `~/.alldaypoke/config.json`
+- Session: `~/.alldaypoke/openai-session.json`
 - Usage tracking: Local, no external API calls
 
 ## How It's Different
@@ -111,7 +111,7 @@ Run tests with:
 node test-subscription.js
 
 # Test with CLI
-openclaw setup-token --test
+alldaypoke setup-token --test
 ```
 
 ## Manual Usage Updates
@@ -147,7 +147,7 @@ If automatic tracking is off:
 - Check ChatGPT directly for exact count
 
 ### Session expired
-- Clear session: `openclaw setup-token --clear`
+- Clear session: `alldaypoke setup-token --clear`
 - Login again through the app
 
 ## Why Subscription Tracking?

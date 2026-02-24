@@ -1,4 +1,4 @@
-# OpenClaw Pet - Usage Update Guide
+# All Day Poke - Usage Update Guide
 
 ## The Challenge
 
@@ -8,7 +8,7 @@ Claude Code's `/usage` command displays your token usage in a modern interactive
 
 ### Method 1: Right-Click Menu (Easiest)
 
-1. **Right-click** on the OpenClaw pet robot
+1. **Right-click** on the All Day Poke pet robot
 2. Select **📊 Update Usage** from the menu
 3. A small window will appear
 4. Run `/usage` in Claude Code to see your current usage percentage
@@ -32,7 +32,7 @@ This will save your usage as 42%.
 
 ### Method 3: Manual File Edit
 
-Edit the file directly at `~/.openclaw-pet/real-usage.json`:
+Edit the file directly at `~/.alldaypoke/real-usage.json`:
 
 ```json
 {
@@ -76,7 +76,7 @@ All failed because Claude Code detects it's not running in an interactive termin
 
 - `update-usage.js` - Interactive command-line updater
 - `manual-usage-update.js` - Direct percentage updater
-- `~/.openclaw-pet/real-usage.json` - Storage for your usage data
+- `~/.alldaypoke/real-usage.json` - Storage for your usage data
 - Right-click menu option in the pet for easy updates
 
 ## Troubleshooting
@@ -90,11 +90,11 @@ All failed because Claude Code detects it's not running in an interactive termin
 - Start it: `npm start`
 
 **Want to reset to automatic (demo) mode?**
-- Delete the usage file: `rm ~/.openclaw-pet/real-usage.json`
+- Delete the usage file: `rm ~/.alldaypoke/real-usage.json`
 - Restart the app
 
 ## Current Status
 
 Your usage is currently set to **25%** (last updated at 22:51:03 UTC).
 
-The pet reads from `~/.openclaw-pet/real-usage.json` every 30 seconds, so any updates you make will be reflected automatically within half a minute.
+The pet reads from `~/.alldaypoke/real-usage.json` every 30 seconds, so any updates you make will be reflected automatically within half a minute.

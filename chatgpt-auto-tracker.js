@@ -10,9 +10,9 @@ const https = require('https');
 class ChatGPTAutoTracker extends EventEmitter {
   constructor() {
     super();
-    this.usageFile = path.join(os.homedir(), '.openclaw-pet', 'real-usage.json');
-    this.sessionFile = path.join(os.homedir(), '.openclaw-pet', 'chatgpt-session.json');
-    this.configFile = path.join(os.homedir(), '.openclaw-pet', 'openai-session.json');
+    this.usageFile = path.join(os.homedir(), '.alldaypoke', 'real-usage.json');
+    this.sessionFile = path.join(os.homedir(), '.alldaypoke', 'chatgpt-session.json');
+    this.configFile = path.join(os.homedir(), '.alldaypoke', 'openai-session.json');
     this.checkInterval = null;
     this.currentUsage = 0;
     this.messagesUsed = 0;

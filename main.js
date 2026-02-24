@@ -50,7 +50,7 @@ const supabaseClient = require('./supabase-client');
 const SocialSync = require('./social-sync');
 
 // Configuration
-const CONFIG_DIR = path.join(os.homedir(), '.openclaw-pet');
+const CONFIG_DIR = path.join(os.homedir(), '.alldaypoke');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 
 let mainWindow;
@@ -279,7 +279,7 @@ function normalizeUsageData(data, defaultSource = 'manual-file') {
 }
 
 function checkManualUsageFile() {
-  const manualUsageFile = path.join(os.homedir(), '.openclaw-pet', 'real-usage.json');
+  const manualUsageFile = path.join(os.homedir(), '.alldaypoke', 'real-usage.json');
   try {
     if (fs.existsSync(manualUsageFile)) {
       const data = JSON.parse(fs.readFileSync(manualUsageFile, 'utf8'));
@@ -710,7 +710,7 @@ function openLoginWindow() {
       preload: path.join(__dirname, 'preload-social.js'),
     },
     backgroundColor: '#0d0d0d',
-    title: 'OpenClaw — Login',
+    title: 'All Day Poke — Login',
   });
 
   loginWindow.loadFile(path.join(__dirname, 'renderer', 'login.html'));
@@ -735,7 +735,7 @@ function openSocialWindow() {
       preload: path.join(__dirname, 'preload-social.js'),
     },
     backgroundColor: '#0d0d0d',
-    title: 'OpenClaw — Social Ranking',
+    title: 'All Day Poke — Social Ranking',
   });
 
   socialWindow.loadFile(path.join(__dirname, 'renderer', 'social.html'));
@@ -874,7 +874,7 @@ ipcMain.handle('social-get-local-info', () => {
 
   // Read tier from saved usage data
   try {
-    const usageFile = require('path').join(require('os').homedir(), '.openclaw-pet', 'real-usage.json');
+    const usageFile = require('path').join(require('os').homedir(), '.alldaypoke', 'real-usage.json');
     if (require('fs').existsSync(usageFile)) {
       const saved = JSON.parse(require('fs').readFileSync(usageFile, 'utf8'));
       if (saved.subscriptionTier) info.subscriptionTier = saved.subscriptionTier;
@@ -1013,7 +1013,7 @@ ipcMain.handle('show-context-menu', (event) => {
                   const fs = require('fs');
                   const path = require('path');
                   const os = require('os');
-                  const usageFile = path.join(os.homedir(), '.openclaw-pet', 'real-usage.json');
+                  const usageFile = path.join(os.homedir(), '.alldaypoke', 'real-usage.json');
                   const dir = path.dirname(usageFile);
 
                   if (!fs.existsSync(dir)) {
@@ -1089,25 +1089,25 @@ ipcMain.handle('show-context-menu', (event) => {
   menu.popup(BrowserWindow.fromWebContents(event.sender));
 });
 
-// ── Deep link protocol: openclaw://invite/CODE ──────────────────────────
+// ── Deep link protocol: alldaypoke://invite/CODE ──────────────────────────
 
 // Register the custom protocol (macOS: works after first launch sets the handler)
 if (process.defaultApp) {
   // Dev mode: need to pass the app path
-  app.setAsDefaultProtocolClient('openclaw', process.execPath, [path.resolve(process.argv[1])]);
+  app.setAsDefaultProtocolClient('alldaypoke', process.execPath, [path.resolve(process.argv[1])]);
 } else {
-  app.setAsDefaultProtocolClient('openclaw');
+  app.setAsDefaultProtocolClient('alldaypoke');
 }
 
 /**
- * Parse an openclaw:// URL and handle the invite flow.
+ * Parse an alldaypoke:// URL and handle the invite flow.
  * - If logged in → add friend immediately
  * - If not logged in → store pendingInviteCode, open login; friend added after login
  */
 async function handleDeepLink(url) {
   console.log('Deep link received:', url);
-  // Parse: openclaw://invite/ABCD1234
-  const match = url.match(/openclaw:\/\/invite\/([A-Za-z0-9]+)/);
+  // Parse: alldaypoke://invite/ABCD1234
+  const match = url.match(/alldaypoke:\/\/invite\/([A-Za-z0-9]+)/);
   if (!match) return;
 
   const code = match[1].toUpperCase();
@@ -1162,7 +1162,7 @@ if (!gotTheLock) {
 } else {
   app.on('second-instance', (event, argv) => {
     // The URL is the last argument
-    const url = argv.find(arg => arg.startsWith('openclaw://'));
+    const url = argv.find(arg => arg.startsWith('alldaypoke://'));
     if (url) handleDeepLink(url);
     // Focus main window
     if (mainWindow) {
@@ -1173,7 +1173,7 @@ if (!gotTheLock) {
 }
 
 // Also check process.argv for URL on first launch
-const launchUrl = process.argv.find(arg => arg.startsWith('openclaw://'));
+const launchUrl = process.argv.find(arg => arg.startsWith('alldaypoke://'));
 
 // App event handlers
 app.whenReady().then(() => {

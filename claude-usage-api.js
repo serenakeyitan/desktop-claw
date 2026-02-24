@@ -20,7 +20,7 @@ ensureStripAnsi();
 
 class ClaudeUsageAPI {
   constructor() {
-    this.usageFile = path.join(os.homedir(), '.openclaw-pet', 'real-usage.json');
+    this.usageFile = path.join(os.homedir(), '.alldaypoke', 'real-usage.json');
   }
 
   // Try to get usage using script command for terminal emulation

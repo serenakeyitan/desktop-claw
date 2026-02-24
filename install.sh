@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ── OpenClaw Installer ───────────────────────────────────────────────────
-# Usage: curl -fsSL https://openclaw.ai/install.sh | bash
+# ── All Day Poke Installer ───────────────────────────────────────────────────
+# Usage: curl -fsSL https://alldaypoke.com/install.sh | bash
 # ─────────────────────────────────────────────────────────────────────────
 
 REPO="https://github.com/serenakeyitan/desktop-claw.git"
-INSTALL_DIR="$HOME/.openclaw"
-BIN_LINK="/usr/local/bin/openclaw"
+INSTALL_DIR="$HOME/.alldaypoke"
+BIN_LINK="/usr/local/bin/alldaypoke"
 
 # Colors
 R='\033[0m' B='\033[1m' G='\033[32m' Y='\033[33m' C='\033[36m' RED='\033[31m'
@@ -19,12 +19,12 @@ fail()  { printf "${RED}${B} ✗${R} %s\n" "$*"; exit 1; }
 
 # ── Pre-flight checks ────────────────────────────────────────────────────
 
-info "OpenClaw installer"
+info "All Day Poke installer"
 echo ""
 
 # Check OS (macOS only for now)
 if [[ "$(uname)" != "Darwin" ]]; then
-  fail "OpenClaw currently supports macOS only."
+  fail "All Day Poke currently supports macOS only."
 fi
 
 # Check for git
@@ -64,7 +64,7 @@ else
     warn "Removing stale $INSTALL_DIR"
     rm -rf "$INSTALL_DIR"
   fi
-  info "Cloning OpenClaw..."
+  info "Cloning All Day Poke..."
   git clone --depth 1 "$REPO" "$INSTALL_DIR"
   ok "Cloned to $INSTALL_DIR"
 fi
@@ -78,29 +78,29 @@ ok "Dependencies installed"
 
 # ── Create config directory ──────────────────────────────────────────────
 
-mkdir -p "$HOME/.openclaw-pet"
+mkdir -p "$HOME/.alldaypoke"
 
 # ── Symlink CLI ──────────────────────────────────────────────────────────
 
-info "Setting up 'openclaw' command..."
+info "Setting up 'alldaypoke' command..."
 
 # Make the launcher executable
-chmod +x "$INSTALL_DIR/openclaw"
+chmod +x "$INSTALL_DIR/alldaypoke"
 
 # Try /usr/local/bin first, fall back to ~/bin
 if [[ -w "$(dirname "$BIN_LINK")" ]] || sudo -n true 2>/dev/null; then
   # Can write to /usr/local/bin (or have passwordless sudo)
   if [[ -w "$(dirname "$BIN_LINK")" ]]; then
-    ln -sf "$INSTALL_DIR/openclaw" "$BIN_LINK"
+    ln -sf "$INSTALL_DIR/alldaypoke" "$BIN_LINK"
   else
-    sudo ln -sf "$INSTALL_DIR/openclaw" "$BIN_LINK"
+    sudo ln -sf "$INSTALL_DIR/alldaypoke" "$BIN_LINK"
   fi
-  ok "Linked: openclaw -> $BIN_LINK"
+  ok "Linked: alldaypoke -> $BIN_LINK"
 else
   # Fallback: ~/bin
   mkdir -p "$HOME/bin"
-  ln -sf "$INSTALL_DIR/openclaw" "$HOME/bin/openclaw"
-  ok "Linked: openclaw -> ~/bin/openclaw"
+  ln -sf "$INSTALL_DIR/alldaypoke" "$HOME/bin/alldaypoke"
+  ok "Linked: alldaypoke -> ~/bin/alldaypoke"
   if [[ ":$PATH:" != *":$HOME/bin:"* ]]; then
     warn "Add ~/bin to your PATH:  export PATH=\"\$HOME/bin:\$PATH\""
   fi
@@ -109,15 +109,15 @@ fi
 # ── Done ─────────────────────────────────────────────────────────────────
 
 echo ""
-printf "${G}${B}  OpenClaw installed successfully!${R}\n"
+printf "${G}${B}  All Day Poke installed successfully!${R}\n"
 echo ""
 echo "  Start the app:"
-printf "    ${C}openclaw start${R}\n"
+printf "    ${C}alldaypoke start${R}\n"
 echo ""
 echo "  Or launch directly:"
 printf "    ${C}cd $INSTALL_DIR && npm start${R}\n"
 echo ""
 echo "  Other commands:"
-printf "    ${C}openclaw help${R}          Show all commands\n"
-printf "    ${C}openclaw setup${R}         Configure authentication\n"
+printf "    ${C}alldaypoke help${R}          Show all commands\n"
+printf "    ${C}alldaypoke setup${R}         Configure authentication\n"
 echo ""

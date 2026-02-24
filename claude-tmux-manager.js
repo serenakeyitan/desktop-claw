@@ -10,7 +10,7 @@ const { getClaudeBinaryPath, checkClaudeAuth } = require('./claude-path');
 class ClaudeTmuxManager extends EventEmitter {
   constructor() {
     super();
-    this.usageFile = path.join(os.homedir(), '.openclaw-pet', 'real-usage.json');
+    this.usageFile = path.join(os.homedir(), '.alldaypoke', 'real-usage.json');
     this.sessionName = 'claude-usage-tracker';
     this.claudeBinary = null;
     this.checkInterval = null;

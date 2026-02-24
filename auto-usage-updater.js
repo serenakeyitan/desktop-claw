@@ -5,7 +5,7 @@ const ClaudeOAuthUsageTracker = require('./claude-oauth-usage-tracker');
 
 class AutoUsageUpdater {
   constructor() {
-    this.usageFile = path.join(os.homedir(), '.openclaw-pet', 'real-usage.json');
+    this.usageFile = path.join(os.homedir(), '.alldaypoke', 'real-usage.json');
     this.updateInterval = null;
     this.claudeTracker = null;
   }

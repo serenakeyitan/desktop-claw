@@ -1,5 +1,5 @@
 {
-  "name": "openclaw-pet",
+  "name": "alldaypoke",
   "version": "1.0.0",
   "description": "A minimalist desktop widget showing Claude API usage with animated robot",
   "main": "main.js",
@@ -11,9 +11,9 @@
     "setup-token": "node cli-setup.js"
   },
   "bin": {
-    "openclaw": "./openclaw"
+    "alldaypoke": "./alldaypoke"
   },
-  "author": "OpenClaw",
+  "author": "All Day Poke",
   "license": "MIT",
   "devDependencies": {
     "electron": "^33.0.0"

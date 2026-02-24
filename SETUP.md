@@ -1,8 +1,8 @@
-# 🔧 OpenClaw Setup Guide
+# 🔧 All Day Poke Setup Guide
 
 ## Quick Start with CLI
 
-OpenClaw now includes a command-line setup tool for easy configuration of your OpenAI authentication.
+All Day Poke now includes a command-line setup tool for easy configuration of your OpenAI authentication.
 
 ### Installation
 
@@ -10,7 +10,7 @@ OpenClaw now includes a command-line setup tool for easy configuration of your O
 # Install dependencies
 npm install
 
-# Optional: Install globally for openclaw command
+# Optional: Install globally for alldaypoke command
 npm link
 ```
 
@@ -22,8 +22,8 @@ npm link
 # Using npm script
 npm run setup-token
 
-# Or using the openclaw command (if linked)
-openclaw setup-token
+# Or using the alldaypoke command (if linked)
+alldaypoke setup-token
 
 # Or directly
 node cli-setup.js
@@ -33,7 +33,7 @@ node cli-setup.js
 
 ```bash
 # Set API key directly
-openclaw setup-token --api-key sk-proj-...
+alldaypoke setup-token --api-key sk-proj-...
 
 # Or via npm
 npm run setup -- --api-key sk-proj-...
@@ -43,24 +43,24 @@ npm run setup -- --api-key sk-proj-...
 
 ```bash
 # Configure OAuth credentials
-openclaw setup-token --oauth
+alldaypoke setup-token --oauth
 ```
 
 ### Test Your Setup
 
 ```bash
 # Test authentication and fetch usage
-openclaw setup-token --test
+alldaypoke setup-token --test
 
 # Or run full integration test
-openclaw test
+alldaypoke test
 ```
 
 ### Clear Credentials
 
 ```bash
 # Remove all saved authentication
-openclaw setup-token --clear
+alldaypoke setup-token --clear
 ```
 
 ## Authentication Methods
@@ -70,12 +70,12 @@ openclaw setup-token --clear
 1. Get your API key from [OpenAI API Keys](https://platform.openai.com/api-keys)
 2. Run setup:
    ```bash
-   openclaw setup-token
+   alldaypoke setup-token
    ```
 3. Choose option 1 and enter your API key
 4. Start the app:
    ```bash
-   openclaw start
+   alldaypoke start
    ```
 
 **Note:** Most API keys don't have billing access, so usage will be simulated.
@@ -88,20 +88,20 @@ openclaw setup-token --clear
 
 2. Run OAuth setup:
    ```bash
-   openclaw setup-token --oauth
+   alldaypoke setup-token --oauth
    ```
 
 3. Enter your Client ID and Secret
 
 4. Start the app and complete login:
    ```bash
-   openclaw start
+   alldaypoke start
    ```
 
 ## CLI Commands Reference
 
 ```bash
-openclaw <command> [options]
+alldaypoke <command> [options]
 
 Commands:
   setup-token        Configure OpenAI authentication
@@ -138,9 +138,9 @@ npm start
 ## Configuration Files
 
 Authentication is stored in:
-- Config: `~/.openclaw-pet/config.json`
-- Token: `~/.openclaw-pet/openai-token.json`
-- Usage cache: `~/.openclaw-pet/real-usage.json`
+- Config: `~/.alldaypoke/config.json`
+- Token: `~/.alldaypoke/openai-token.json`
+- Usage cache: `~/.alldaypoke/real-usage.json`
 
 ## Troubleshooting
 
@@ -157,23 +157,23 @@ Authentication is stored in:
 1. Go to https://platform.openai.com/settings/oauth
 2. Create a new OAuth application
 3. Set redirect URI to `http://localhost:8765/callback`
-4. Run `openclaw setup-token --oauth` with your credentials
+4. Run `alldaypoke setup-token --oauth` with your credentials
 
 ### Test Authentication
 
 ```bash
 # Quick test
-openclaw setup-token --test
+alldaypoke setup-token --test
 
 # Full integration test
-openclaw test
+alldaypoke test
 ```
 
 ## Examples
 
 ```bash
 # First time setup (interactive)
-$ openclaw setup-token
+$ alldaypoke setup-token
 🔍 Checking existing configuration...
 ❌ No existing authentication found
 
@@ -195,7 +195,7 @@ Enter your OpenAI API key: ********
 ✅ API key saved successfully!
 
 # Quick API key setup
-$ openclaw setup-token --api-key sk-proj-abc123...
+$ alldaypoke setup-token --api-key sk-proj-abc123...
 ✅ API key saved!
 ✅ Successfully fetched usage data!
    Current usage: 15%
@@ -203,8 +203,8 @@ $ openclaw setup-token --api-key sk-proj-abc123...
    Reset date: 12/31/2024
 
 # Start the app
-$ openclaw start
-Starting OpenClaw Pet...
+$ alldaypoke start
+Starting All Day Poke...
 ```
 
 ## Security Notes
@@ -212,11 +212,11 @@ Starting OpenClaw Pet...
 - Credentials are stored locally in your home directory
 - API keys are never sent to third parties
 - OAuth tokens are automatically refreshed when needed
-- Use `openclaw setup-token --clear` to remove all credentials
+- Use `alldaypoke setup-token --clear` to remove all credentials
 
 ## Support
 
 For issues or questions:
-1. Run `openclaw setup-token --test` to diagnose problems
-2. Check the configuration files in `~/.openclaw-pet/`
+1. Run `alldaypoke setup-token --test` to diagnose problems
+2. Check the configuration files in `~/.alldaypoke/`
 3. Open an issue on GitHub with the test output

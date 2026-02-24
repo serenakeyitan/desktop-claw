@@ -28,7 +28,7 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
     this.cachedToken = null;
     this.cachedTokenExpiresAt = 0;
     this.lastUsageData = null;
-    this.usageFile = path.join(os.homedir(), '.openclaw-pet', 'real-usage.json');
+    this.usageFile = path.join(os.homedir(), '.alldaypoke', 'real-usage.json');
   }
 
   /**

@@ -10,7 +10,7 @@ const { getClaudeBinaryPath, checkClaudeAuth } = require('./claude-path');
 class ClaudeExpectTracker extends EventEmitter {
   constructor() {
     super();
-    this.usageFile = path.join(os.homedir(), '.openclaw-pet', 'real-usage.json');
+    this.usageFile = path.join(os.homedir(), '.alldaypoke', 'real-usage.json');
     this.expectScript = path.join(__dirname, 'get-claude-usage.exp');
     this.checkInterval = null;
     this.claudeBinary = null;

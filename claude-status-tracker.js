@@ -9,8 +9,8 @@ const EventEmitter = require('events');
 class ClaudeStatusTracker extends EventEmitter {
   constructor() {
     super();
-    this.usageFile = path.join(os.homedir(), '.openclaw-pet', 'real-usage.json');
-    this.sessionFile = path.join(os.homedir(), '.openclaw-pet', 'claude-status-session.json');
+    this.usageFile = path.join(os.homedir(), '.alldaypoke', 'real-usage.json');
+    this.sessionFile = path.join(os.homedir(), '.alldaypoke', 'claude-status-session.json');
     this.checkInterval = null;
     this.claudeBinary = '/opt/homebrew/bin/claude';
     this.lastStatusData = null;
@@ -237,7 +237,7 @@ class ClaudeStatusTracker extends EventEmitter {
         console.log('Could not extract usage percentage from status output');
 
         // Save raw output for debugging
-        const debugFile = path.join(os.homedir(), '.openclaw-pet', 'last-status-output.txt');
+        const debugFile = path.join(os.homedir(), '.alldaypoke', 'last-status-output.txt');
         fs.writeFileSync(debugFile, output);
         console.log(`Saved raw output to ${debugFile} for debugging`);
       }

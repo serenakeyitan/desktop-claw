@@ -1,4 +1,4 @@
-# ChatGPT Plus Usage Tracker - OpenClaw Pet
+# ChatGPT Plus Usage Tracker - All Day Poke
 
 This desktop pet tracks your ChatGPT Plus subscription usage, specifically GPT-4 message limits.
 
@@ -24,7 +24,7 @@ npm install
 
 1. Run the setup command:
 ```bash
-openclaw setup-token
+alldaypoke setup-token
 ```
 
 2. Start the application:
@@ -72,16 +72,16 @@ If the automatic tracking is off, you can manually update:
 
 ```bash
 # Setup ChatGPT Plus tracking
-openclaw setup-token
+alldaypoke setup-token
 
 # Test your session
-openclaw setup-token --test
+alldaypoke setup-token --test
 
 # Clear saved session
-openclaw setup-token --clear
+alldaypoke setup-token --clear
 
 # Start the app
-openclaw start
+alldaypoke start
 ```
 
 ## Troubleshooting
@@ -104,7 +104,7 @@ openclaw start
 
 ## Privacy
 
-- All authentication tokens are stored locally in `~/.openclaw-pet/`
+- All authentication tokens are stored locally in `~/.alldaypoke/`
 - No data is sent to external servers except OpenAI's API
 - OAuth tokens are refreshed automatically when needed
 

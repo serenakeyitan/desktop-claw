@@ -5,7 +5,7 @@ const path = require('path');
 const os = require('os');
 const readline = require('readline');
 
-const usageFile = path.join(os.homedir(), '.openclaw-pet', 'real-usage.json');
+const usageFile = path.join(os.homedir(), '.alldaypoke', 'real-usage.json');
 
 function saveUsage(percentage) {
   const dir = path.dirname(usageFile);
@@ -44,7 +44,7 @@ if (process.argv[2]) {
 } else {
   // Interactive mode
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log(' 📊 OpenClaw Pet Usage Updater');
+  console.log(' 📊 All Day Poke Usage Updater');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log();
   console.log('To update your usage:');

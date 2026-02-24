@@ -9,8 +9,8 @@ const EventEmitter = require('events');
 class ClaudeAutoTracker extends EventEmitter {
   constructor() {
     super();
-    this.usageFile = path.join(os.homedir(), '.openclaw-pet', 'real-usage.json');
-    this.sessionFile = path.join(os.homedir(), '.openclaw-pet', 'claude-session.json');
+    this.usageFile = path.join(os.homedir(), '.alldaypoke', 'real-usage.json');
+    this.sessionFile = path.join(os.homedir(), '.alldaypoke', 'claude-session.json');
     this.isTracking = false;
     this.sessionStartTime = null;
     this.totalSessionMinutes = 0;

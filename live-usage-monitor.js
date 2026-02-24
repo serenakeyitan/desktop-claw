@@ -8,7 +8,7 @@ const { getClaudeBinaryPath } = require('./claude-path');
 
 class LiveUsageMonitor {
   constructor() {
-    this.usageFile = path.join(os.homedir(), '.openclaw-pet', 'real-usage.json');
+    this.usageFile = path.join(os.homedir(), '.alldaypoke', 'real-usage.json');
     this.ptyProcess = null;
     this.output = '';
     this.lastUsage = null;

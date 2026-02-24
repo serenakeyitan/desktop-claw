@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const usageFile = path.join(os.homedir(), '.openclaw-pet', 'real-usage.json');
+const usageFile = path.join(os.homedir(), '.alldaypoke', 'real-usage.json');
 
 // Method 1: Try to run claude with /usage command directly
 function fetchUsageDirectly() {
@@ -173,7 +173,7 @@ async function autoFetchUsage() {
 
   if (percentage !== null) {
     const data = saveUsage(percentage);
-    console.log('\n🤖 OpenClaw Pet will now show your real usage!');
+    console.log('\n🤖 All Day Poke will now show your real usage!');
     return data;
   } else {
     console.error('❌ Could not parse usage percentage from Claude output');

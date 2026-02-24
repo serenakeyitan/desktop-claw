@@ -1,4 +1,4 @@
-# OpenClaw Desktop Pet — Project Spec
+# All Day Poke Desktop Pet — Project Spec
 > For Claude Code. Build this as a complete, runnable Electron app.
 
 ---
@@ -71,7 +71,7 @@ Poll Anthropic usage endpoint to get real stats.
 
 **Endpoint:** `https://api.anthropic.com/v1/usage` (or user-configured)
 
-**Config** (read from `~/.openclaw-pet/config.json`):
+**Config** (read from `~/.alldaypoke/config.json`):
 ```json
 {
   "anthropic_api_key": "sk-ant-...",
@@ -95,7 +95,7 @@ Poll Anthropic usage endpoint to get real stats.
 Monitor for active API calls via one of these methods (try in order):
 
 **Method A — Proxy mode (preferred)**
-Run a local HTTP proxy on `localhost:9999`. User points their OpenClaw/Claude Code client at this proxy. The proxy forwards to the real Anthropic API and intercepts traffic to detect active calls.
+Run a local HTTP proxy on `localhost:9999`. User points their All Day Poke/Claude Code client at this proxy. The proxy forwards to the real Anthropic API and intercepts traffic to detect active calls.
 
 When a request is in-flight → set `ACTIVE` state for 10s.
 
@@ -121,7 +121,7 @@ State resets to `IDLE` automatically after 10s of no activity.
 ## File Structure
 
 ```
-openclaw-pet/
+alldaypoke/
 ├── package.json
 ├── main.js              # Electron main — window setup, tray, IPC
 ├── preload.js           # Context bridge
@@ -165,7 +165,7 @@ renderer → main:
 
 ## Config File
 
-Location: `~/.openclaw-pet/config.json`
+Location: `~/.alldaypoke/config.json`
 
 ```json
 {

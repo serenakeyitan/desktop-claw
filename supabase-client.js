@@ -2,7 +2,7 @@
  * Supabase Client — initialization and auth helpers
  *
  * Reads SUPABASE_URL and SUPABASE_ANON_KEY from the app config file
- * (~/.openclaw-pet/config.json).  Provides sign-up, sign-in, sign-out,
+ * (~/.alldaypoke/config.json).  Provides sign-up, sign-in, sign-out,
  * session restore, and profile management (username + invite code).
  */
 
@@ -11,7 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const CONFIG_DIR = path.join(os.homedir(), '.openclaw-pet');
+const CONFIG_DIR = path.join(os.homedir(), '.alldaypoke');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 const SESSION_FILE = path.join(CONFIG_DIR, 'supabase-session.json');
 

@@ -28,7 +28,7 @@ logs/
 *.log
 
 # User data
-~/.openclaw-pet/
+~/.alldaypoke/
 
 # Test coverage
 coverage/

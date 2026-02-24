@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OpenClaw Setup</title>
+  <title>All Day Poke Setup</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -201,7 +201,7 @@
   <div class="setup-container">
     <h1>
       <span class="robot-icon"></span>
-      OpenClaw Pet Setup
+      All Day Poke Setup
     </h1>
 
     <div class="description">
@@ -245,7 +245,7 @@
 
     <div class="buttons">
       <button class="secondary" onclick="skipSetup()">Skip (demo mode)</button>
-      <button id="launch-btn" onclick="launchApp()" disabled>Launch OpenClaw</button>
+      <button id="launch-btn" onclick="launchApp()" disabled>Launch All Day Poke</button>
     </div>
   </div>
 
@@ -392,7 +392,7 @@
 
     // ── Skip ──
     function skipSetup() {
-      if (confirm('OpenClaw will run in demo mode without real usage data. Continue?')) {
+      if (confirm('All Day Poke will run in demo mode without real usage data. Continue?')) {
         window.electronAPI.completeSetup('demo');
       }
     }

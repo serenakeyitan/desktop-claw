@@ -15,7 +15,7 @@ class OpenAIAuth extends EventEmitter {
     this.accessToken = null;
     this.refreshToken = null;
     this.apiKey = null; // For API key authentication
-    this.tokenFile = path.join(os.homedir(), '.openclaw-pet', 'openai-token.json');
+    this.tokenFile = path.join(os.homedir(), '.alldaypoke', 'openai-token.json');
 
     // OpenAI OAuth configuration
     // Note: You'll need to register your app at https://platform.openai.com/settings/oauth

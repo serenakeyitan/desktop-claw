@@ -59,7 +59,7 @@ if [[ $output =~ FOUND_USAGE:([0-9]+) ]]; then
     const path = require('path');
     const os = require('os');
 
-    const file = path.join(os.homedir(), '.openclaw-pet', 'real-usage.json');
+    const file = path.join(os.homedir(), '.alldaypoke', 'real-usage.json');
     const dir = path.dirname(file);
 
     if (!fs.existsSync(dir)) {
@@ -79,7 +79,7 @@ if [[ $output =~ FOUND_USAGE:([0-9]+) ]]; then
     };
 
     fs.writeFileSync(file, JSON.stringify(data, null, 2));
-    console.log('Updated ~/.openclaw-pet/real-usage.json');
+    console.log('Updated ~/.alldaypoke/real-usage.json');
     "
 else
     echo "❌ Could not find usage in output"

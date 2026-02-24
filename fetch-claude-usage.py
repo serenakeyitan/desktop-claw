@@ -137,7 +137,7 @@ def parse_usage(output):
 def save_usage(percentage):
     """Save usage data to file"""
     home = os.path.expanduser('~')
-    dir_path = os.path.join(home, '.openclaw-pet')
+    dir_path = os.path.join(home, '.alldaypoke')
     file_path = os.path.join(dir_path, 'real-usage.json')
 
     # Create directory if it doesn't exist
@@ -196,7 +196,7 @@ def main():
 
     if percentage is not None:
         save_usage(percentage)
-        print("\n🤖 OpenClaw Pet will now show your real usage!")
+        print("\n🤖 All Day Poke will now show your real usage!")
         return True
     else:
         print("❌ Could not parse usage from output")

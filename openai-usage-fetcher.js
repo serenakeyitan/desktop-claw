@@ -7,7 +7,7 @@ class OpenAIUsageFetcher extends EventEmitter {
   constructor() {
     super();
     this.usageData = null;
-    this.usageFile = path.join(os.homedir(), '.openclaw-pet', 'real-usage.json');
+    this.usageFile = path.join(os.homedir(), '.alldaypoke', 'real-usage.json');
     this.checkInterval = null;
     this.authManager = null;
   }

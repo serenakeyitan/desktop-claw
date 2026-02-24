@@ -15,7 +15,7 @@ class AuthManager extends EventEmitter {
     // OAuth configuration for Anthropic/Claude
     // Note: These are example endpoints - actual Anthropic OAuth may differ
     this.oauthConfig = {
-      clientId: process.env.ANTHROPIC_CLIENT_ID || 'openclaw-pet',
+      clientId: process.env.ANTHROPIC_CLIENT_ID || 'alldaypoke',
       redirectUri: 'http://localhost:8989/callback',
       authorizationUrl: 'https://console.anthropic.com/oauth/authorize', // Try console.anthropic.com
       tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
@@ -154,7 +154,7 @@ class AuthManager extends EventEmitter {
             <!DOCTYPE html>
             <html>
             <head>
-              <title>OpenClaw Pet - Authentication</title>
+              <title>All Day Poke - Authentication</title>
               <style>
                 body {
                   background: #1a1a1a;
@@ -199,7 +199,7 @@ class AuthManager extends EventEmitter {
                    <p>Error: ${error}</p>
                    <p>Please try again or use an API key instead.</p>` :
                   `<h1 class="success">Authentication Successful!</h1>
-                   <p>OpenClaw Pet is now connected to your Claude account.</p>
+                   <p>All Day Poke is now connected to your Claude account.</p>
                    <p>You can close this browser tab.</p>`
                 }
               </div>
@@ -359,7 +359,7 @@ class AuthManager extends EventEmitter {
     const path = require('path');
     const os = require('os');
 
-    const configDir = path.join(os.homedir(), '.openclaw-pet');
+    const configDir = path.join(os.homedir(), '.alldaypoke');
     const tokenFile = path.join(configDir, '.tokens');
 
     if (!fs.existsSync(configDir)) {
@@ -383,7 +383,7 @@ class AuthManager extends EventEmitter {
     const path = require('path');
     const os = require('os');
 
-    const tokenFile = path.join(os.homedir(), '.openclaw-pet', '.tokens');
+    const tokenFile = path.join(os.homedir(), '.alldaypoke', '.tokens');
 
     if (fs.existsSync(tokenFile)) {
       try {
@@ -404,7 +404,7 @@ class AuthManager extends EventEmitter {
     const path = require('path');
     const os = require('os');
 
-    const tokenFile = path.join(os.homedir(), '.openclaw-pet', '.tokens');
+    const tokenFile = path.join(os.homedir(), '.alldaypoke', '.tokens');
 
     if (fs.existsSync(tokenFile)) {
       fs.unlinkSync(tokenFile);
