@@ -1,3 +1,39 @@
+// ── EPIPE protection ─────────────────────────────────────────────────────
+// Must be the VERY FIRST thing that runs, before any require() that might
+// call console.log at import time.
+//
+// Electron pipes stdout/stderr to the parent process (or nowhere when
+// launched from Finder). When that pipe breaks, Socket._write throws EPIPE
+// synchronously from native code. We patch the write() method on the actual
+// socket objects so the throw is caught before it reaches Console internals.
+(function installEpipeProtection() {
+  function patchStream(stream) {
+    if (!stream || typeof stream.write !== 'function') return;
+    const origWrite = stream.write;
+    stream.write = function (chunk, encoding, callback) {
+      try {
+        return origWrite.call(this, chunk, encoding, callback);
+      } catch (e) {
+        if (e.code === 'EPIPE' || e.code === 'ERR_STREAM_DESTROYED') return true;
+        throw e;
+      }
+    };
+    stream.on('error', (err) => {
+      if (err.code === 'EPIPE' || err.code === 'ERR_STREAM_DESTROYED') return;
+      throw err;
+    });
+  }
+  patchStream(process.stdout);
+  patchStream(process.stderr);
+
+  process.on('uncaughtException', (err) => {
+    if (err.code === 'EPIPE' || err.code === 'ERR_STREAM_DESTROYED') return;
+    try { process.stderr.write(`Uncaught exception: ${err.stack || err}\n`); } catch (_) {}
+    process.exit(1);
+  });
+})();
+// ── End EPIPE protection ─────────────────────────────────────────────────
+
 const { app, BrowserWindow, ipcMain, Menu, shell, dialog, screen, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
