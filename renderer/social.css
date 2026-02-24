@@ -130,7 +130,7 @@ body {
 #table-header {
   display: flex;
   align-items: center;
-  padding: 5px 10px;
+  padding: 6px 10px;
   gap: 12px;
   background: #151515;
   border: 1px solid #282828;
@@ -139,6 +139,8 @@ body {
   font-size: 8px;
   letter-spacing: 1px;
 }
+
+#table-header .col-sessions { font-size: 8px; color: #555; }
 
 #table-body {
   border: 1px solid #282828;
@@ -149,10 +151,11 @@ body {
 /* ── Column widths ── */
 .col-rank { width: 20px; text-align: center; flex-shrink: 0; }
 .col-user { flex: 1; min-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.col-usage { width: 54px; text-align: center; flex-shrink: 0; }
-.col-sessions { width: 46px; text-align: center; flex-shrink: 0; color: #555; font-size: 9px; }
-.col-time { width: 50px; text-align: center; flex-shrink: 0; }
-.col-vibing { width: 54px; text-align: center; flex-shrink: 0; }
+.col-usage { width: 54px; text-align: right; flex-shrink: 0; }
+.col-sessions { width: 36px; text-align: right; flex-shrink: 0; color: #555; font-size: 9px; }
+.col-time { width: 44px; text-align: right; flex-shrink: 0; }
+.col-vibing { width: 58px; text-align: center; flex-shrink: 0; }
+.col-poke { width: 42px; flex-shrink: 0; }
 
 /* ── Ranking Row ── */
 .ranking-row {
@@ -520,7 +523,6 @@ body {
   padding: 2px 8px;
   cursor: pointer;
   letter-spacing: 0.5px;
-  flex-shrink: 0;
   transition: all 0.15s;
 }
 
@@ -541,10 +543,7 @@ body {
   background: rgba(57, 255, 20, 0.08);
 }
 
-.col-poke-spacer {
-  width: 42px;
-  flex-shrink: 0;
-}
+/* col-poke defined above in Column widths */
 
 /* ── Pulse animation for vibing ── */
 @keyframes pulse-vibe {
@@ -553,3 +552,53 @@ body {
 }
 
 .vibing-dot.online { animation: pulse-vibe 2s ease-in-out infinite; }
+
+/* ── Responsive design ── */
+
+/* Small windows (< 420px) */
+@media (max-width: 420px) {
+  #social-container { padding: 10px; }
+
+  #title {
+    font-size: 11px;
+    letter-spacing: 1px;
+  }
+
+  #table-header, .ranking-row {
+    padding-left: 6px;
+    padding-right: 6px;
+    gap: 6px;
+  }
+
+  .col-sessions { display: none; }
+  .col-poke { width: 36px; }
+
+  .poke-btn { padding: 2px 5px; font-size: 7px; }
+
+  #add-friend-panel { gap: 4px; }
+  .action-btn { padding: 6px 8px; font-size: 8px; }
+}
+
+/* Very small windows (< 340px) */
+@media (max-width: 340px) {
+  .col-time { display: none; }
+  .col-vibing { width: 44px; }
+  .vibing-text { font-size: 7px; }
+}
+
+/* Tall windows — stretch the table */
+@media (min-height: 650px) {
+  #table-body { min-height: 280px; }
+}
+
+/* Short windows — reduce spacing */
+@media (max-height: 400px) {
+  #social-container { padding: 8px; }
+  #header { margin-bottom: 6px; padding-bottom: 4px; }
+  #main-tabs { margin-bottom: 4px; }
+  .main-tab { padding: 5px; }
+  #period-tabs { margin-bottom: 6px; }
+  .period-tab { padding: 3px 4px; }
+  #add-friend-panel { margin-top: 6px; padding-top: 6px; }
+  #table-body { min-height: 80px; }
+}

@@ -201,7 +201,7 @@ function setupIPC() {
   // Listen for poke (pat-head animation)
   window.electronAPI.onPokeReceived((data) => {
     if (robot) {
-      robot.patHead();
+      robot.patHead(data?.senderName);
     }
   });
 

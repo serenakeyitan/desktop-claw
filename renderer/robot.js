@@ -172,15 +172,22 @@ class PixelRobot {
   }
 
   // Trigger a pat-head (拍拍头) animation — robot squishes and bounces for 3 seconds
-  patHead() {
+  patHead(senderName) {
     if (this._patting) return; // don't stack
     this._patting = true;
 
-    // Show a hand emoji above the robot
-    const hand = document.createElement('div');
+    // Show headpat gif above the robot
+    const hand = document.createElement('img');
     hand.className = 'poke-hand';
-    hand.textContent = '✋';
+    hand.src = '../headpat.gif';
+    hand.draggable = false;
     this.container.appendChild(hand);
+
+    // Show "poked by X" message bubble
+    const msg = document.createElement('div');
+    msg.className = 'poke-msg';
+    msg.textContent = senderName ? `${senderName} poked you!` : 'Poked!';
+    this.container.appendChild(msg);
 
     // Add pat-head class to SVG for squish animation
     this.svg.classList.add('pat-head');
@@ -194,6 +201,7 @@ class PixelRobot {
     setTimeout(() => {
       this.svg.classList.remove('pat-head');
       hand.remove();
+      msg.remove();
       // Restore eyes to current state
       const eyeColor = this.state === 'active'
         ? this.colors.eyesActive

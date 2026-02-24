@@ -199,3 +199,26 @@ body {
 
 /* ── Utility ── */
 .hidden { display: none !important; }
+
+/* ── Responsive design ── */
+
+@media (max-width: 380px) {
+  #container {
+    width: 100%;
+    padding: 16px;
+  }
+
+  #logo { font-size: 15px; letter-spacing: 2px; }
+  #header { margin-bottom: 20px; }
+
+  .form-panel input { padding: 8px 10px; font-size: 11px; }
+  .primary-btn { padding: 9px; font-size: 10px; }
+}
+
+@media (max-height: 420px) {
+  body { align-items: flex-start; padding-top: 10px; }
+  #header { margin-bottom: 16px; }
+  .form-panel h2 { margin-bottom: 10px; }
+  .form-panel input { margin-bottom: 6px; padding: 7px 10px; }
+  .switch-text { margin-top: 8px; }
+}

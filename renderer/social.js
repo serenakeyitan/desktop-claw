@@ -199,9 +199,8 @@ function renderRanking(data) {
       ? 'LIVE'
       : (lastActive ? lastActive : 'idle');
 
-    // Show poke button on friends tab for other users (not yourself)
-    const isSelf = myProfile && (item.username === myProfile.username);
-    const showPoke = currentTab === 'friends' && !isSelf && item.user_id;
+    // Show poke button for all users (including yourself)
+    const showPoke = (currentTab === 'friends' || currentTab === 'global') && item.user_id;
 
     row.innerHTML = `
       <span class="col-rank">${rank}</span>
@@ -216,16 +215,31 @@ function renderRanking(data) {
         <span class="vibing-dot ${isVibing ? 'online' : 'offline'}"></span>
         <span class="vibing-text ${isVibing ? 'active' : ''}">${vibingLabel}</span>
       </span>
-      ${showPoke ? `<button class="poke-btn" data-uid="${item.user_id}" title="Poke ${escapeHtml(item.display_name || item.username)}">Poke</button>` : '<span class="col-poke-spacer"></span>'}
+      <span class="col-poke">${showPoke ? `<button class="poke-btn" data-uid="${item.user_id}" title="Poke ${escapeHtml(item.display_name || item.username)}">Poke</button>` : ''}</span>
     `;
 
     // Attach poke handler
     if (showPoke) {
       const pokeBtn = row.querySelector('.poke-btn');
+      const isSelf = myProfile && (item.user_id === 'self' || item.user_id === myProfile.id || item.username === myProfile.username);
       pokeBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
         pokeBtn.disabled = true;
         pokeBtn.textContent = '...';
+
+        // Self-poke: trigger robot animation, no server call
+        if (isSelf) {
+          window.socialAPI.triggerSelfPoke();
+          pokeBtn.textContent = 'Poked!';
+          pokeBtn.classList.add('poked');
+          setTimeout(() => {
+            pokeBtn.textContent = 'Poke';
+            pokeBtn.classList.remove('poked');
+            pokeBtn.disabled = false;
+          }, 2000);
+          return;
+        }
+
         try {
           const res = await window.socialAPI.sendPoke(item.user_id);
           if (res.success) {
@@ -419,6 +433,7 @@ async function buildLocalSelfRanking(period) {
 
     // Always return at least a self row — never return empty
     return [{
+      user_id: profile?.id || 'self',
       username: profile?.username || 'You',
       display_name: profile?.display_name || profile?.username || 'You',
       subscription_tier: tier,
@@ -433,6 +448,7 @@ async function buildLocalSelfRanking(period) {
     console.error('buildLocalSelfRanking failed:', err);
     // Even on total failure, return a minimal self row
     return [{
+      user_id: 'self',
       username: 'You',
       display_name: 'You',
       subscription_tier: 'pro',

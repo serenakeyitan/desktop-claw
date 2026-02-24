@@ -341,22 +341,41 @@ body {
   60% { transform: scaleY(1.05) scaleX(0.97); }
 }
 
-/* Hand emoji shown during pat */
+/* Headpat gif shown during pat */
 .poke-hand {
   position: absolute;
-  top: -8px;
+  top: -24px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 20px;
-  animation: pat-hand 0.4s ease-in-out infinite;
+  width: 56px;
+  height: auto;
   pointer-events: none;
   z-index: 20;
-  filter: drop-shadow(0 0 4px rgba(255, 204, 0, 0.5));
 }
 
-@keyframes pat-hand {
-  0%, 100% { transform: translateX(-50%) translateY(0) rotate(-10deg); }
-  50% { transform: translateX(-50%) translateY(6px) rotate(5deg); }
+/* Poke message bubble */
+.poke-msg {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 28px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #ffcc00;
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 9px;
+  font-weight: bold;
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 25;
+  animation: poke-msg-in 0.3s ease-out;
+}
+
+@keyframes poke-msg-in {
+  0% { opacity: 0; transform: translateX(-50%) translateY(6px); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
 /* Dragging styles */

@@ -704,7 +704,9 @@ function openLoginWindow() {
   loginWindow = new BrowserWindow({
     width: 380,
     height: 480,
-    resizable: false,
+    minWidth: 300,
+    minHeight: 380,
+    resizable: true,
     minimizable: true,
     maximizable: false,
     webPreferences: {
@@ -729,9 +731,11 @@ function openSocialWindow() {
   socialWindow = new BrowserWindow({
     width: 480,
     height: 560,
+    minWidth: 320,
+    minHeight: 380,
     resizable: true,
     minimizable: true,
-    maximizable: false,
+    maximizable: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -924,6 +928,14 @@ ipcMain.handle('social-send-poke', async (event, recipientId) => {
   } catch (err) {
     return { success: false, error: err.message };
   }
+});
+
+// Self-poke: trigger the robot animation on the main widget
+ipcMain.handle('trigger-self-poke', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('poke-received', { senderName: 'You' });
+  }
+  return { success: true };
 });
 
 // Poll for incoming pokes every 10 seconds — forward to main widget renderer

@@ -200,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
     successEl.classList.add('hidden');
 
     if (!otp || otp.length < 6) {
-      errEl.textContent = 'Please enter the 6-digit code from your email';
+      errEl.textContent = 'Please enter the code from your email';
       errEl.classList.remove('hidden');
       return;
     }

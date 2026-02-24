@@ -30,4 +30,5 @@ contextBridge.exposeInMainWorld('socialAPI', {
 
   // Pokes
   sendPoke: (recipientId) => ipcRenderer.invoke('social-send-poke', recipientId),
+  triggerSelfPoke: () => ipcRenderer.invoke('trigger-self-poke'),
 });
