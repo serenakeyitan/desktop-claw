@@ -510,6 +510,42 @@ body {
 /* ── Utility ── */
 .hidden { display: none !important; }
 
+/* ── Poke button ── */
+.poke-btn {
+  background: transparent;
+  border: 1px solid #444;
+  color: #888;
+  font-family: inherit;
+  font-size: 8px;
+  padding: 2px 8px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.poke-btn:hover {
+  border-color: #cd7f5d;
+  color: #cd7f5d;
+  background: rgba(205, 127, 93, 0.08);
+}
+
+.poke-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.poke-btn.poked {
+  border-color: #39ff14;
+  color: #39ff14;
+  background: rgba(57, 255, 20, 0.08);
+}
+
+.col-poke-spacer {
+  width: 42px;
+  flex-shrink: 0;
+}
+
 /* ── Pulse animation for vibing ── */
 @keyframes pulse-vibe {
   0%, 100% { opacity: 1; }

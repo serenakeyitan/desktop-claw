@@ -171,6 +171,40 @@ class PixelRobot {
     }
   }
 
+  // Trigger a pat-head (拍拍头) animation — robot squishes and bounces for 3 seconds
+  patHead() {
+    if (this._patting) return; // don't stack
+    this._patting = true;
+
+    // Show a hand emoji above the robot
+    const hand = document.createElement('div');
+    hand.className = 'poke-hand';
+    hand.textContent = '✋';
+    this.container.appendChild(hand);
+
+    // Add pat-head class to SVG for squish animation
+    this.svg.classList.add('pat-head');
+
+    // Make eyes happy (become little crescents via color change)
+    this.pixelGroups.eyes.forEach(pixel => {
+      pixel.setAttribute('fill', '#ffcc00');
+    });
+
+    // Remove after 3 seconds
+    setTimeout(() => {
+      this.svg.classList.remove('pat-head');
+      hand.remove();
+      // Restore eyes to current state
+      const eyeColor = this.state === 'active'
+        ? this.colors.eyesActive
+        : this.colors.eyes;
+      this.pixelGroups.eyes.forEach(pixel => {
+        pixel.setAttribute('fill', eyeColor);
+      });
+      this._patting = false;
+    }, 3000);
+  }
+
   // Trigger a blink animation
   blink() {
     this.pixelGroups.eyes.forEach(pixel => {

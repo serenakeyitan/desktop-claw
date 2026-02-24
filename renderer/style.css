@@ -299,6 +299,35 @@ body {
   animation: pulse 2s ease-in-out infinite;
 }
 
+/* ── Pat-head (poke) animation ── */
+.pixel-robot.pat-head {
+  animation: pat-squish 0.4s ease-in-out infinite !important;
+}
+
+@keyframes pat-squish {
+  0%, 100% { transform: scaleY(1) scaleX(1); }
+  40% { transform: scaleY(0.8) scaleX(1.1) translateY(2px); }
+  60% { transform: scaleY(1.05) scaleX(0.97); }
+}
+
+/* Hand emoji shown during pat */
+.poke-hand {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 20px;
+  animation: pat-hand 0.4s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 20;
+  filter: drop-shadow(0 0 4px rgba(255, 204, 0, 0.5));
+}
+
+@keyframes pat-hand {
+  0%, 100% { transform: translateX(-50%) translateY(0) rotate(-10deg); }
+  50% { transform: translateX(-50%) translateY(6px) rotate(5deg); }
+}
+
 /* Dragging styles */
 body.dragging {
   cursor: grabbing !important;

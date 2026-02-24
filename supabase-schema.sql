@@ -105,7 +105,37 @@ create policy "Users can update own status"
 create policy "Users can insert own status"
   on public.user_status for insert with check (auth.uid() = user_id);
 
--- 5. Helper function: generate unique invite code
+-- 5. Pokes table (friend-to-friend pokes)
+create table if not exists public.pokes (
+  id bigint generated always as identity primary key,
+  sender_id uuid references public.profiles(id) on delete cascade not null,
+  recipient_id uuid references public.profiles(id) on delete cascade not null,
+  created_at timestamptz default now(),
+  read_at timestamptz  -- null = unread
+);
+
+alter table public.pokes enable row level security;
+
+-- Sender can insert pokes
+create policy "Users can send pokes"
+  on public.pokes for insert
+  with check (auth.uid() = sender_id);
+
+-- Recipient can read their own pokes
+create policy "Users can read own pokes"
+  on public.pokes for select
+  using (auth.uid() = recipient_id);
+
+-- Recipient can mark their pokes as read
+create policy "Users can update own pokes"
+  on public.pokes for update
+  using (auth.uid() = recipient_id);
+
+-- Index for fast unread poke queries
+create index if not exists idx_pokes_recipient_unread
+  on public.pokes(recipient_id, read_at) where read_at is null;
+
+-- 6. Helper function: generate unique invite code
 create or replace function generate_invite_code()
 returns text as $$
 declare
@@ -188,6 +218,7 @@ begin
     select json_agg(row_to_json(r))
     from (
       select
+        p.id as user_id,
         p.username,
         p.display_name,
         p.subscription_tier,

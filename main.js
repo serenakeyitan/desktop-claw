@@ -523,6 +523,7 @@ function cleanupServices() {
     sessionMonitor.stop();
     sessionMonitor = null;
   }
+  stopPokePolling();
   if (socialSync) {
     socialSync.stop();
     socialSync = null;
@@ -750,6 +751,7 @@ async function startSocialSync() {
 
   socialSync = new SocialSync(usageDB);
   await socialSync.start();
+  startPokePolling();
   console.log('Social sync started');
 
   // If session monitor is active, feed vibing status
@@ -892,6 +894,53 @@ ipcMain.handle('social-get-local-info', () => {
 
   return info;
 });
+
+// ── Poke: send / poll / forward ──────────────────────────────────────────
+
+ipcMain.handle('social-send-poke', async (event, recipientId) => {
+  if (!socialSync) return { success: false, error: 'Not logged in' };
+  try {
+    return await socialSync.sendPoke(recipientId);
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// Poll for incoming pokes every 10 seconds — forward to main widget renderer
+let pokePoller = null;
+
+function startPokePolling() {
+  if (pokePoller) return;
+  pokePoller = setInterval(async () => {
+    if (!socialSync) return;
+    try {
+      const pokes = await socialSync.getUnreadPokes();
+      if (pokes.length > 0) {
+        // Forward to main widget for head-pat animation
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('poke-received', pokes[0]);
+        }
+        // Show system notification
+        if (Notification.isSupported()) {
+          new Notification({
+            title: 'Poke!',
+            body: `${pokes[0].senderName} poked you!`,
+            silent: false,
+          }).show();
+        }
+        // Mark all as read
+        const ids = pokes.map(p => p.id);
+        await socialSync.markPokesRead(ids);
+      }
+    } catch (err) {
+      // Silently ignore polling errors
+    }
+  }, 10000);
+}
+
+function stopPokePolling() {
+  if (pokePoller) { clearInterval(pokePoller); pokePoller = null; }
+}
 
 // Context menu
 ipcMain.handle('show-context-menu', (event) => {

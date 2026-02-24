@@ -24,4 +24,7 @@ contextBridge.exposeInMainWorld('socialAPI', {
 
   // Local info (detected tier + active sessions)
   getLocalInfo: () => ipcRenderer.invoke('social-get-local-info'),
+
+  // Pokes
+  sendPoke: (recipientId) => ipcRenderer.invoke('social-send-poke', recipientId),
 });

@@ -199,6 +199,10 @@ function renderRanking(data) {
       ? 'LIVE'
       : (lastActive ? lastActive : 'idle');
 
+    // Show poke button on friends tab for other users (not yourself)
+    const isSelf = myProfile && (item.username === myProfile.username);
+    const showPoke = currentTab === 'friends' && !isSelf && item.user_id;
+
     row.innerHTML = `
       <span class="col-rank">${rank}</span>
       <div class="user-cell col-user">
@@ -212,7 +216,36 @@ function renderRanking(data) {
         <span class="vibing-dot ${isVibing ? 'online' : 'offline'}"></span>
         <span class="vibing-text ${isVibing ? 'active' : ''}">${vibingLabel}</span>
       </span>
+      ${showPoke ? `<button class="poke-btn" data-uid="${item.user_id}" title="Poke ${escapeHtml(item.display_name || item.username)}">Poke</button>` : '<span class="col-poke-spacer"></span>'}
     `;
+
+    // Attach poke handler
+    if (showPoke) {
+      const pokeBtn = row.querySelector('.poke-btn');
+      pokeBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        pokeBtn.disabled = true;
+        pokeBtn.textContent = '...';
+        try {
+          const res = await window.socialAPI.sendPoke(item.user_id);
+          if (res.success) {
+            pokeBtn.textContent = 'Poked!';
+            pokeBtn.classList.add('poked');
+            setTimeout(() => {
+              pokeBtn.textContent = 'Poke';
+              pokeBtn.classList.remove('poked');
+              pokeBtn.disabled = false;
+            }, 2000);
+          } else {
+            pokeBtn.textContent = 'Fail';
+            setTimeout(() => { pokeBtn.textContent = 'Poke'; pokeBtn.disabled = false; }, 1500);
+          }
+        } catch {
+          pokeBtn.textContent = 'Fail';
+          setTimeout(() => { pokeBtn.textContent = 'Poke'; pokeBtn.disabled = false; }, 1500);
+        }
+      });
+    }
 
     fragment.appendChild(row);
   });

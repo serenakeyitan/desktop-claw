@@ -39,11 +39,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('session-update', (event, data) => callback(data));
   },
 
+  onPokeReceived: (callback) => {
+    ipcRenderer.on('poke-received', (event, data) => callback(data));
+  },
+
   // Remove listeners
   removeAllListeners: () => {
     ipcRenderer.removeAllListeners('token-update');
     ipcRenderer.removeAllListeners('state-change');
     ipcRenderer.removeAllListeners('reset-tick');
     ipcRenderer.removeAllListeners('session-update');
+    ipcRenderer.removeAllListeners('poke-received');
   }
 });

@@ -232,6 +232,76 @@ class SocialSync extends EventEmitter {
     return data || [];
   }
 
+  // ── pokes ─────────────────────────────────────────────────────────────
+
+  /**
+   * Send a poke to a friend.
+   * @param {string} recipientId — UUID of the friend to poke
+   */
+  async sendPoke(recipientId) {
+    const sb = getSupabase();
+    if (!sb) throw new Error('Not connected');
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Not logged in');
+
+    const { error } = await sb
+      .from('pokes')
+      .insert({ sender_id: user.id, recipient_id: recipientId });
+
+    if (error) throw error;
+    return { success: true };
+  }
+
+  /**
+   * Fetch unread pokes for the current user.
+   * Returns array of { id, sender_id, sender_username, created_at }.
+   */
+  async getUnreadPokes() {
+    const sb = getSupabase();
+    if (!sb) return [];
+    const user = await getCurrentUser();
+    if (!user) return [];
+
+    const { data, error } = await sb
+      .from('pokes')
+      .select('id, sender_id, created_at, profiles!pokes_sender_id_fkey(username, display_name)')
+      .eq('recipient_id', user.id)
+      .is('read_at', null)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (error) {
+      console.error('SocialSync: getUnreadPokes failed', error.message);
+      return [];
+    }
+
+    return (data || []).map(row => ({
+      id: row.id,
+      senderId: row.sender_id,
+      senderName: row.profiles?.display_name || row.profiles?.username || 'Someone',
+      createdAt: row.created_at,
+    }));
+  }
+
+  /**
+   * Mark pokes as read.
+   * @param {number[]} pokeIds
+   */
+  async markPokesRead(pokeIds) {
+    if (!pokeIds || pokeIds.length === 0) return;
+    const sb = getSupabase();
+    if (!sb) return;
+
+    const { error } = await sb
+      .from('pokes')
+      .update({ read_at: new Date().toISOString() })
+      .in('id', pokeIds);
+
+    if (error) {
+      console.error('SocialSync: markPokesRead failed', error.message);
+    }
+  }
+
   // ── friends ────────────────────────────────────────────────────────────
 
   /**

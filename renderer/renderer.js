@@ -127,6 +127,13 @@ function setupIPC() {
     }
   });
 
+  // Listen for poke (pat-head animation)
+  window.electronAPI.onPokeReceived((data) => {
+    if (robot) {
+      robot.patHead();
+    }
+  });
+
   // Listen for session updates
   window.electronAPI.onSessionUpdate((data) => {
     const sessionText = document.getElementById('session-text');
