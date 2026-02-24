@@ -221,11 +221,15 @@ function renderRanking(data) {
     // Attach poke handler
     if (showPoke) {
       const pokeBtn = row.querySelector('.poke-btn');
-      const isSelf = myProfile && (item.user_id === 'self' || item.user_id === myProfile.id || item.username === myProfile.username);
       pokeBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
         pokeBtn.disabled = true;
         pokeBtn.textContent = '...';
+
+        // Check isSelf at click time (myProfile may have loaded by now)
+        const isSelf = item.user_id === 'self'
+          || (myProfile && item.user_id === myProfile.id)
+          || (myProfile && item.username === myProfile.username);
 
         // Self-poke: trigger robot animation, no server call
         if (isSelf) {
@@ -433,7 +437,7 @@ async function buildLocalSelfRanking(period) {
 
     // Always return at least a self row — never return empty
     return [{
-      user_id: profile?.id || 'self',
+      user_id: 'self',
       username: profile?.username || 'You',
       display_name: profile?.display_name || profile?.username || 'You',
       subscription_tier: tier,

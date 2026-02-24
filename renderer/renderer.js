@@ -231,8 +231,17 @@ function setupIPC() {
 
       sessionText.innerHTML =
         `<span class="${dotClass}"></span>${summary}: ${items.join(', ')}`;
+
+      // Update robot face based on session activity
+      if (robot) {
+        robot.setState(shownBusy > 0 ? 'active' : 'idle');
+      }
     } else {
       sessionText.innerHTML = '';
+      // No sessions — robot goes idle
+      if (robot) {
+        robot.setState('idle');
+      }
     }
   });
 }

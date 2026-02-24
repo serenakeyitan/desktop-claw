@@ -10,7 +10,7 @@ body {
   font-size: 10px;
   color: #888;
   background: transparent;
-  overflow: hidden;
+  overflow: visible;
   user-select: none;
   -webkit-user-select: none;
   cursor: default;
@@ -221,6 +221,7 @@ body {
   cursor: pointer;
   transform-origin: center bottom;
   transition: transform 0.1s ease;
+  overflow: visible;
 }
 
 /* ── Resize Handle (bottom-right of robot) ── */
@@ -376,6 +377,23 @@ body {
 @keyframes poke-msg-in {
   0% { opacity: 0; transform: translateX(-50%) translateY(6px); }
   100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* Floating hearts during pat */
+.poke-heart {
+  position: absolute;
+  bottom: 50%;
+  font-size: 16px;
+  color: #ff69b4;
+  pointer-events: none;
+  z-index: 30;
+  animation: heart-float 2.5s ease-out forwards;
+}
+
+@keyframes heart-float {
+  0% { opacity: 1; transform: translateY(0) scale(0.5); }
+  50% { opacity: 1; transform: translateY(-40px) scale(1); }
+  100% { opacity: 0; transform: translateY(-70px) scale(0.8); }
 }
 
 /* Dragging styles */

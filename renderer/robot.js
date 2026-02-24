@@ -60,22 +60,7 @@ class PixelRobot {
       });
     });
 
-    // Add CRT scanline effect overlay
-    const scanlines = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    scanlines.classList.add('scanlines');
-
-    for (let i = 0; i < this.gridHeight; i += 2) {
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      line.setAttribute('x', '0');
-      line.setAttribute('y', i * this.pixelSize);
-      line.setAttribute('width', this.gridWidth * this.pixelSize);
-      line.setAttribute('height', this.pixelSize);
-      line.setAttribute('fill', 'rgba(0,0,0,0.05)');
-      line.setAttribute('pointer-events', 'none');
-      scanlines.appendChild(line);
-    }
-
-    svg.appendChild(scanlines);
+    // Scanlines removed — they created visible grey blocks on transparent background
     this.container.appendChild(svg);
     this.svg = svg;
   }
@@ -191,24 +176,63 @@ class PixelRobot {
 
     // Add pat-head class to SVG for squish animation
     this.svg.classList.add('pat-head');
+    // Stop vibrating/floating during pat so squish is visible
+    this.svg.classList.remove('vibrating');
+    this.svg.classList.remove('state-idle', 'state-active');
 
-    // Make eyes happy (become little crescents via color change)
+    // Make eyes happy — turn pink and squint (^_^)
+    const ps = this.pixelSize;
     this.pixelGroups.eyes.forEach(pixel => {
-      pixel.setAttribute('fill', '#ffcc00');
+      pixel._origY = pixel.getAttribute('y');
+      pixel._origH = pixel.getAttribute('height');
+      pixel._origFill = pixel.getAttribute('fill');
+      pixel.setAttribute('fill', '#ff69b4');
+      const origY = parseFloat(pixel._origY);
+      pixel.setAttribute('y', origY + ps * 0.6);
+      pixel.setAttribute('height', ps * 0.4);
     });
+
+    // Tint body warmer (blushing)
+    this.pixelGroups.body.forEach(pixel => {
+      pixel._origBodyFill = pixel.getAttribute('fill');
+      pixel.setAttribute('fill', '#e8956e');
+    });
+
+    // Float hearts up from the robot
+    for (let i = 0; i < 3; i++) {
+      const heart = document.createElement('div');
+      heart.className = 'poke-heart';
+      heart.textContent = '♥';
+      heart.style.left = `${30 + i * 25}%`;
+      heart.style.animationDelay = `${i * 0.4}s`;
+      this.container.appendChild(heart);
+      setTimeout(() => heart.remove(), 3000);
+    }
 
     // Remove after 3 seconds
     setTimeout(() => {
       this.svg.classList.remove('pat-head');
+      this.svg.classList.add(`state-${this.state}`);
+      if (this.state === 'active') this.svg.classList.add('vibrating');
+
       hand.remove();
       msg.remove();
-      // Restore eyes to current state
+
+      // Restore eyes
       const eyeColor = this.state === 'active'
         ? this.colors.eyesActive
         : this.colors.eyes;
       this.pixelGroups.eyes.forEach(pixel => {
         pixel.setAttribute('fill', eyeColor);
+        pixel.setAttribute('y', pixel._origY);
+        pixel.setAttribute('height', pixel._origH);
       });
+
+      // Restore body
+      this.pixelGroups.body.forEach(pixel => {
+        pixel.setAttribute('fill', pixel._origBodyFill || this.colors.body);
+      });
+
       this._patting = false;
     }, 3000);
   }
