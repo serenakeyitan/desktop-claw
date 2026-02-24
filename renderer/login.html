@@ -23,7 +23,36 @@
       <div class="switch-text">
         No account? <a href="#" id="show-signup">Create one</a>
       </div>
+      <div class="switch-text">
+        <a href="#" id="show-forgot">Forgot password?</a>
+      </div>
       <div id="login-error" class="error hidden"></div>
+    </div>
+
+    <!-- Forgot Password: enter email -->
+    <div id="forgot-form" class="form-panel hidden">
+      <h2>Reset Password</h2>
+      <p class="hint">Enter your email and we'll send a reset link.</p>
+      <input type="email" id="forgot-email" placeholder="Email" autocomplete="email" />
+      <button id="forgot-btn" class="primary-btn">Send Reset Link</button>
+      <div id="forgot-sent" class="success-msg hidden">Check your email and click the reset link. The app will open automatically.</div>
+      <div class="switch-text">
+        <a href="#" id="forgot-back-login">Back to sign in</a>
+      </div>
+      <div id="forgot-error" class="error hidden"></div>
+    </div>
+
+    <!-- New Password: shown after clicking email link -->
+    <div id="reset-form" class="form-panel hidden">
+      <h2>Set New Password</h2>
+      <input type="password" id="reset-password" placeholder="New password (min 6 chars)" autocomplete="new-password" />
+      <input type="password" id="reset-password-confirm" placeholder="Confirm new password" autocomplete="new-password" />
+      <button id="reset-btn" class="primary-btn">Update Password</button>
+      <div id="reset-success" class="success-msg hidden">Password updated! You can now sign in.</div>
+      <div class="switch-text">
+        <a href="#" id="reset-back-login">Back to sign in</a>
+      </div>
+      <div id="reset-error" class="error hidden"></div>
     </div>
 
     <!-- Sign-Up Form -->

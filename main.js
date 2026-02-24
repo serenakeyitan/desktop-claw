@@ -69,6 +69,7 @@ let socialWindow;
 let socialSync;
 let lastUsagePct = null;  // tracks last OAuth utilization for delta computation
 let pendingInviteCode = null;  // queued invite code from deep link, processed after login
+let pendingResetTokens = null; // { access_token, refresh_token } from password-reset deep link
 let currentState = 'idle';
 let lastActivityTime = Date.now();
 let windowPosition = null;
@@ -838,6 +839,24 @@ ipcMain.handle('social-sign-out', async () => {
   }
 });
 
+ipcMain.handle('social-send-reset', async (event, email) => {
+  try {
+    await supabaseClient.sendPasswordReset(email);
+    return { success: true };
+  } catch (err) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('social-reset-password', async (event, accessToken, refreshToken, newPassword) => {
+  try {
+    await supabaseClient.resetPassword(accessToken, refreshToken, newPassword);
+    return { success: true };
+  } catch (err) {
+    return { error: err.message };
+  }
+});
+
 ipcMain.handle('social-is-logged-in', async () => {
   const user = await supabaseClient.getCurrentUser();
   return { loggedIn: !!user };
@@ -1157,7 +1176,28 @@ if (process.defaultApp) {
  */
 async function handleDeepLink(url) {
   console.log('Deep link received:', url);
-  // Parse: alldaypoke://invite/ABCD1234
+
+  // ── Password reset: alldaypoke://reset#access_token=…&refresh_token=…
+  if (url.includes('alldaypoke://reset')) {
+    const hashPart = url.split('#')[1] || '';
+    const params = new URLSearchParams(hashPart);
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+    if (accessToken && refreshToken) {
+      pendingResetTokens = { access_token: accessToken, refresh_token: refreshToken };
+      console.log('Password reset tokens received via deep link');
+      openLoginWindow();
+      // Notify the login window to show the new-password form
+      setTimeout(() => {
+        if (loginWindow && !loginWindow.isDestroyed()) {
+          loginWindow.webContents.send('show-reset-form', pendingResetTokens);
+        }
+      }, 500);
+    }
+    return;
+  }
+
+  // ── Invite: alldaypoke://invite/ABCD1234
   const match = url.match(/alldaypoke:\/\/invite\/([A-Za-z0-9]+)/);
   if (!match) return;
 

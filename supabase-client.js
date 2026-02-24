@@ -231,6 +231,49 @@ async function getMyProfile() {
   return data;
 }
 
+// ── password reset ─────────────────────────────────────────────────────────
+
+/**
+ * Send a password-reset email.  The link in the email will redirect to
+ * alldaypoke://reset#access_token=…&refresh_token=… so the desktop app
+ * can catch it via deep-link and let the user set a new password in-app.
+ */
+async function sendPasswordReset(email) {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase not configured');
+
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: 'alldaypoke://reset',
+  });
+  if (error) throw error;
+}
+
+/**
+ * After catching the deep-link tokens, restore a session and then
+ * update the user's password.
+ */
+async function resetPassword(accessToken, refreshToken, newPassword) {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase not configured');
+
+  // Set the session from the reset-link tokens
+  const { error: sessionErr } = await sb.auth.setSession({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+  if (sessionErr) throw sessionErr;
+
+  // Update password
+  const { error: updateErr } = await sb.auth.updateUser({
+    password: newPassword,
+  });
+  if (updateErr) throw updateErr;
+
+  // Clear session — user should log in again with new password
+  await sb.auth.signOut().catch(() => {});
+  clearSession();
+}
+
 // ── invite code helper (client-side fallback) ──────────────────────────────
 
 function generateInviteCode() {
@@ -252,6 +295,8 @@ module.exports = {
   signOut,
   getCurrentUser,
   getMyProfile,
+  sendPasswordReset,
+  resetPassword,
   saveConfig,
   loadConfig,
   generateInviteCode,
