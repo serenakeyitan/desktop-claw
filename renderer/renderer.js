@@ -211,8 +211,12 @@ function setupIPC() {
     if (!sessionText) return;
 
     if (data.count > 0) {
-      // Build per-session display with busy/idle indicator
-      const items = data.sessions.slice(0, 3).map(s => {
+      // Sort busy first, then show up to 3
+      const sorted = [...data.sessions].sort((a, b) => (b.busy ? 1 : 0) - (a.busy ? 1 : 0));
+      const shown = sorted.slice(0, 3);
+      const shownBusy = shown.filter(s => s.busy).length;
+
+      const items = shown.map(s => {
         const name = s.project || 'unknown';
         if (s.busy) {
           return `<span class="session-busy">${name}</span>`;
@@ -220,10 +224,10 @@ function setupIPC() {
         return `<span class="session-idle">${name}</span>`;
       });
 
-      const dotClass = data.busyCount > 0 ? 'session-dot busy' : 'session-dot idle';
-      const summary = data.busyCount > 0
-        ? `${data.busyCount} running`
-        : `${data.count} idle`;
+      const dotClass = shownBusy > 0 ? 'session-dot busy' : 'session-dot idle';
+      const summary = shownBusy > 0
+        ? `${shownBusy} running`
+        : `${shown.length} idle`;
 
       sessionText.innerHTML =
         `<span class="${dotClass}"></span>${summary}: ${items.join(', ')}`;
