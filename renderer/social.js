@@ -193,10 +193,11 @@ function renderRanking(data) {
 
     const tierLabel = { pro: 'PRO', max_100: 'MAX', max_200: 'MAX+' }[item.subscription_tier] || '';
 
-    // Show project name when vibing, otherwise show "idle"
+    // In ranking tabs: show "LIVE" or "last vibe Xm ago"
+    const lastActive = item.last_active_at ? timeAgo(new Date(item.last_active_at)) : '';
     const vibingLabel = isVibing
-      ? (project ? escapeHtml(project) : 'LIVE')
-      : 'idle';
+      ? 'LIVE'
+      : (lastActive ? lastActive : 'idle');
 
     row.innerHTML = `
       <span class="col-rank">${rank}</span>
