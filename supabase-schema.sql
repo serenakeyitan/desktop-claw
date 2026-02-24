@@ -169,16 +169,18 @@ end;
 $$ language plpgsql security definer;
 
 -- 7. Function to get friend rankings for a period
-create or replace function get_friend_ranking(period text default 'all')
+-- client_today: the client's local date as YYYY-MM-DD (avoids UTC timezone mismatch)
+create or replace function get_friend_ranking(period text default 'all', client_today date default null)
 returns json as $$
 declare
   cutoff date;
+  ref_date date := coalesce(client_today, current_date);
   current_user_id uuid := auth.uid();
 begin
   case period
-    when 'today' then cutoff := current_date;
-    when '7d' then cutoff := current_date - interval '7 days';
-    when '30d' then cutoff := current_date - interval '30 days';
+    when 'today' then cutoff := ref_date;
+    when '7d' then cutoff := ref_date - interval '7 days';
+    when '30d' then cutoff := ref_date - interval '30 days';
     else cutoff := '1970-01-01'::date;
   end case;
 
@@ -212,15 +214,17 @@ end;
 $$ language plpgsql security definer;
 
 -- 8. Function to get global ranking
-create or replace function get_global_ranking(period text default 'all', lim integer default 50)
+-- client_today: the client's local date as YYYY-MM-DD (avoids UTC timezone mismatch)
+create or replace function get_global_ranking(period text default 'all', lim integer default 50, client_today date default null)
 returns json as $$
 declare
   cutoff date;
+  ref_date date := coalesce(client_today, current_date);
 begin
   case period
-    when 'today' then cutoff := current_date;
-    when '7d' then cutoff := current_date - interval '7 days';
-    when '30d' then cutoff := current_date - interval '30 days';
+    when 'today' then cutoff := ref_date;
+    when '7d' then cutoff := ref_date - interval '7 days';
+    when '30d' then cutoff := ref_date - interval '30 days';
     else cutoff := '1970-01-01'::date;
   end case;
 

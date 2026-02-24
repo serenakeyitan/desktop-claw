@@ -419,17 +419,6 @@ async function initializeServices() {
       }
     });
 
-    sessionMonitor.on('session-ended', (session) => {
-      // Process exited entirely
-      if (Notification.isSupported()) {
-        new Notification({
-          title: 'Claude session closed',
-          body: `${session.project || 'Unknown project'} exited after ${session.duration}`,
-          silent: false,
-        }).show();
-      }
-    });
-
     sessionMonitor.on('session-task-finished', (data) => {
       // A session went from busy to idle — the key notification
       if (Notification.isSupported()) {
@@ -841,6 +830,31 @@ ipcMain.handle('social-friend-ranking', async (event, period) => {
 ipcMain.handle('social-global-ranking', async (event, period) => {
   if (!socialSync) return [];
   return await socialSync.getGlobalRanking(period || 'all');
+});
+
+// Return locally-detected subscription tier + active session info for social fallback
+ipcMain.handle('social-get-local-info', () => {
+  const info = { subscriptionTier: 'pro', activeSessions: [] };
+
+  // Read tier from saved usage data
+  try {
+    const usageFile = require('path').join(require('os').homedir(), '.openclaw-pet', 'real-usage.json');
+    if (require('fs').existsSync(usageFile)) {
+      const saved = JSON.parse(require('fs').readFileSync(usageFile, 'utf8'));
+      if (saved.subscriptionTier) info.subscriptionTier = saved.subscriptionTier;
+    }
+  } catch {}
+
+  // Get active session project names from session monitor
+  if (sessionMonitor) {
+    const sessions = sessionMonitor.getSessions();
+    info.activeSessions = sessions.map(s => ({
+      project: s.project || null,
+      busy: s.busy || false,
+    }));
+  }
+
+  return info;
 });
 
 // Context menu

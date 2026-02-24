@@ -21,4 +21,7 @@ contextBridge.exposeInMainWorld('socialAPI', {
 
   // Local ranking (per-project)
   getLocalRanking: (period) => ipcRenderer.invoke('get-ranking', period),
+
+  // Local info (detected tier + active sessions)
+  getLocalInfo: () => ipcRenderer.invoke('social-get-local-info'),
 });

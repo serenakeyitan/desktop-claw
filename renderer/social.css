@@ -130,7 +130,8 @@ body {
 #table-header {
   display: flex;
   align-items: center;
-  padding: 5px 8px;
+  padding: 5px 10px;
+  gap: 12px;
   background: #151515;
   border: 1px solid #282828;
   border-bottom: 2px solid #333;
@@ -146,18 +147,19 @@ body {
 }
 
 /* ── Column widths ── */
-.col-rank { width: 24px; text-align: center; flex-shrink: 0; }
-.col-user { flex: 1; min-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.col-usage { width: 56px; text-align: right; flex-shrink: 0; }
-.col-sessions { width: 32px; text-align: center; flex-shrink: 0; color: #555; font-size: 9px; }
-.col-time { width: 46px; text-align: right; flex-shrink: 0; }
-.col-vibing { width: 56px; text-align: center; flex-shrink: 0; }
+.col-rank { width: 20px; text-align: center; flex-shrink: 0; }
+.col-user { flex: 1; min-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.col-usage { width: 54px; text-align: center; flex-shrink: 0; }
+.col-sessions { width: 46px; text-align: center; flex-shrink: 0; color: #555; font-size: 9px; }
+.col-time { width: 50px; text-align: center; flex-shrink: 0; }
+.col-vibing { width: 54px; text-align: center; flex-shrink: 0; }
 
 /* ── Ranking Row ── */
 .ranking-row {
   display: flex;
   align-items: center;
-  padding: 7px 8px;
+  padding: 7px 10px;
+  gap: 12px;
   border-bottom: 1px solid #151515;
   transition: background 0.1s;
 }

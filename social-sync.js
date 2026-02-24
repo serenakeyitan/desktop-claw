@@ -112,6 +112,18 @@ class SocialSync extends EventEmitter {
     return this.usageDB.data.entries.filter(e => e.timestamp > since);
   }
 
+  /**
+   * Return the user's local date as YYYY-MM-DD string.
+   * Sent to Supabase RPCs so "today" filtering uses the client's timezone.
+   */
+  _localDateStr() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
   // ── heartbeat / status ─────────────────────────────────────────────────
 
   /**
@@ -189,7 +201,10 @@ class SocialSync extends EventEmitter {
   async getFriendRanking(period = 'all') {
     const sb = getSupabase();
     if (!sb) return [];
-    const { data, error } = await sb.rpc('get_friend_ranking', { period });
+    const { data, error } = await sb.rpc('get_friend_ranking', {
+      period,
+      client_today: this._localDateStr(),
+    });
     if (error) {
       console.error('SocialSync: get_friend_ranking failed', error.message);
       return [];
@@ -205,7 +220,11 @@ class SocialSync extends EventEmitter {
   async getGlobalRanking(period = 'all', limit = 50) {
     const sb = getSupabase();
     if (!sb) return [];
-    const { data, error } = await sb.rpc('get_global_ranking', { period, lim: limit });
+    const { data, error } = await sb.rpc('get_global_ranking', {
+      period,
+      lim: limit,
+      client_today: this._localDateStr(),
+    });
     if (error) {
       console.error('SocialSync: get_global_ranking failed', error.message);
       return [];

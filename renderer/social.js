@@ -88,11 +88,24 @@ async function loadFriendRanking() {
   tableBody.innerHTML = '<div id="loading">Loading...</div>';
 
   try {
-    const ranking = await window.socialAPI.getFriendRanking(currentPeriod);
-    renderRanking(ranking || []);
+    let ranking = await window.socialAPI.getFriendRanking(currentPeriod);
+    ranking = ranking || [];
+
+    // If server returned empty, fall back to local data so the user always sees their own stats
+    if (ranking.length === 0) {
+      ranking = await buildLocalSelfRanking(currentPeriod);
+    }
+
+    renderRanking(ranking);
   } catch (err) {
     console.error('Failed to load friend ranking:', err);
-    tableBody.innerHTML = '<div class="empty-state">Failed to load ranking</div>';
+    // Fall back to local data on error
+    try {
+      const fallback = await buildLocalSelfRanking(currentPeriod);
+      renderRanking(fallback);
+    } catch {
+      tableBody.innerHTML = '<div class="empty-state">Failed to load ranking</div>';
+    }
   }
 }
 
@@ -101,11 +114,24 @@ async function loadGlobalRanking() {
   tableBody.innerHTML = '<div id="loading">Loading...</div>';
 
   try {
-    const ranking = await window.socialAPI.getGlobalRanking(currentPeriod);
-    renderRanking(ranking || []);
+    let ranking = await window.socialAPI.getGlobalRanking(currentPeriod);
+    ranking = ranking || [];
+
+    // If server returned empty, fall back to local data so user sees their own stats
+    if (ranking.length === 0) {
+      ranking = await buildLocalSelfRanking(currentPeriod);
+    }
+
+    renderRanking(ranking);
   } catch (err) {
     console.error('Failed to load global ranking:', err);
-    tableBody.innerHTML = '<div class="empty-state">Failed to load ranking</div>';
+    // Fall back to local data on error
+    try {
+      const fallback = await buildLocalSelfRanking(currentPeriod);
+      renderRanking(fallback);
+    } catch {
+      tableBody.innerHTML = '<div class="empty-state">Failed to load ranking</div>';
+    }
   }
 }
 
@@ -115,11 +141,24 @@ async function loadFriendStatus() {
 
   try {
     // Friend ranking with period='all' gives us status data
-    const ranking = await window.socialAPI.getFriendRanking('all');
-    renderStatusList(ranking || []);
+    let ranking = await window.socialAPI.getFriendRanking('all');
+    ranking = ranking || [];
+
+    // If server returned empty, fall back to local self
+    if (ranking.length === 0) {
+      ranking = await buildLocalSelfRanking('all');
+    }
+
+    renderStatusList(ranking);
   } catch (err) {
     console.error('Failed to load friend status:', err);
-    statusList.innerHTML = '<div class="empty-state">Failed to load status</div>';
+    // Fall back to local data on error
+    try {
+      const fallback = await buildLocalSelfRanking('all');
+      renderStatusList(fallback);
+    } catch {
+      statusList.innerHTML = '<div class="empty-state">Failed to load status</div>';
+    }
   }
 }
 
@@ -150,8 +189,14 @@ function renderRanking(data) {
     const timeStr = formatTime(item.total_time_ms || 0);
     const usageStr = formatUsage(item.total_usage || 0, item.subscription_tier);
     const sessions = item.log_count || 0;
+    const project = item.current_project || '';
 
     const tierLabel = { pro: 'PRO', max_100: 'MAX', max_200: 'MAX+' }[item.subscription_tier] || '';
+
+    // Show project name when vibing, otherwise show "idle"
+    const vibingLabel = isVibing
+      ? (project ? escapeHtml(project) : 'LIVE')
+      : 'idle';
 
     row.innerHTML = `
       <span class="col-rank">${rank}</span>
@@ -164,7 +209,7 @@ function renderRanking(data) {
       <span class="col-time">${timeStr}</span>
       <span class="col-vibing">
         <span class="vibing-dot ${isVibing ? 'online' : 'offline'}"></span>
-        <span class="vibing-text ${isVibing ? 'active' : ''}">${isVibing ? 'LIVE' : 'idle'}</span>
+        <span class="vibing-text ${isVibing ? 'active' : ''}">${vibingLabel}</span>
       </span>
     `;
 
@@ -308,6 +353,63 @@ function setupSignOut() {
       console.error('Sign-out failed:', err);
     }
   });
+}
+
+// ── Local Fallback ──────────────────────────────────────────────────────────
+
+/**
+ * Build a self-ranking row from local usage data + profile.
+ * Used as fallback when the server returns empty (e.g., no friends, network error).
+ * Aggregates all local projects into a single row for the current user.
+ */
+async function buildLocalSelfRanking(period) {
+  try {
+    // Fetch all three sources in parallel, but don't let any single failure break the whole thing
+    const [localData, profile, localInfo] = await Promise.all([
+      window.socialAPI.getLocalRanking(period).catch(() => null),
+      myProfile ? Promise.resolve(myProfile) : window.socialAPI.getProfile().catch(() => null),
+      window.socialAPI.getLocalInfo().catch(() => null),
+    ]);
+
+    const total = localData?.total || {};
+
+    // Use locally-detected tier (from real-usage.json) over profile tier,
+    // since profile tier may still be the default 'pro' before first sync
+    const tier = localInfo?.subscriptionTier || profile?.subscription_tier || 'pro';
+
+    // Get active session project names
+    const sessions = localInfo?.activeSessions || [];
+    const projectNames = sessions.map(s => s.project).filter(Boolean);
+    const projectStr = projectNames.join(', ') || null;
+    const isVibing = sessions.length > 0;
+
+    // Always return at least a self row — never return empty
+    return [{
+      username: profile?.username || 'You',
+      display_name: profile?.display_name || profile?.username || 'You',
+      subscription_tier: tier,
+      total_usage: total.totalDelta || 0,
+      total_time_ms: total.totalTimeMs || 0,
+      log_count: localData?.ranking?.reduce((sum, r) => sum + (r.sessionCount || 0), 0) || 0,
+      is_vibing: isVibing,
+      current_project: projectStr,
+      last_active_at: new Date().toISOString(),
+    }];
+  } catch (err) {
+    console.error('buildLocalSelfRanking failed:', err);
+    // Even on total failure, return a minimal self row
+    return [{
+      username: 'You',
+      display_name: 'You',
+      subscription_tier: 'pro',
+      total_usage: 0,
+      total_time_ms: 0,
+      log_count: 0,
+      is_vibing: false,
+      current_project: null,
+      last_active_at: new Date().toISOString(),
+    }];
+  }
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
