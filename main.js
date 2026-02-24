@@ -197,9 +197,9 @@ function createMainWindow() {
     width: windowWidth,
     height: windowHeight,
     minWidth: 60,
-    minHeight: 72,
-    maxWidth: 240,
-    maxHeight: 280,
+    minHeight: 60,
+    maxWidth: 300,
+    maxHeight: 300,
     x: x,
     y: y,
     transparent: true,
@@ -1286,8 +1286,8 @@ ipcMain.handle('set-window-position', (event, { x, y }) => {
 // Handle resize from renderer
 ipcMain.handle('set-window-size', (event, { width, height }) => {
   if (mainWindow) {
-    const w = Math.max(60, Math.min(240, Math.round(width)));
-    const h = Math.max(72, Math.min(280, Math.round(height)));
+    const w = Math.max(60, Math.min(300, Math.round(width)));
+    const h = Math.max(60, Math.min(300, Math.round(height)));
     mainWindow.setSize(w, h);
   }
 });

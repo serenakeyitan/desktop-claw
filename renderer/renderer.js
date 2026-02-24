@@ -120,10 +120,8 @@ function handleResizeMove(e) {
   const deltaX = e.screenX - resizeStartX;
   const deltaY = e.screenY - resizeStartY;
 
-  // Maintain aspect ratio (roughly 5:6 width:height)
-  const delta = Math.max(deltaX, deltaY);
-  const newW = resizeStartW + delta;
-  const newH = resizeStartH + Math.round(delta * 1.2);
+  const newW = resizeStartW + deltaX;
+  const newH = resizeStartH + deltaY;
 
   window.electronAPI.setWindowSize({ width: newW, height: newH });
 }

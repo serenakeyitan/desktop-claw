@@ -32,7 +32,7 @@ body {
 /* ── Hover Bubble ── */
 #bubble {
   position: absolute;
-  bottom: calc(100% - 30px);
+  bottom: 80px;
   left: 50%;
   transform: translateX(-50%);
   opacity: 0;
