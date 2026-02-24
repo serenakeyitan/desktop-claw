@@ -148,7 +148,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Window will be closed by main process
   });
 
-  // ── Forgot Password: send reset email ──
+  // ── Forgot Password: send OTP code ──
+  let resetEmail = ''; // carry email from forgot → reset form
+
   document.getElementById('forgot-btn').addEventListener('click', async () => {
     const email = document.getElementById('forgot-email').value.trim();
     const errEl = document.getElementById('forgot-error');
@@ -172,30 +174,24 @@ document.addEventListener('DOMContentLoaded', () => {
         errEl.textContent = result.error;
         errEl.classList.remove('hidden');
       } else {
+        resetEmail = email;
         sentEl.classList.remove('hidden');
         btn.textContent = 'Sent!';
+        // Auto-navigate to the OTP + new password form after 1.5s
+        setTimeout(() => showPanel(resetForm), 1500);
       }
     } catch (err) {
       errEl.textContent = err.message || 'Failed to send reset email';
       errEl.classList.remove('hidden');
     } finally {
       btn.disabled = false;
-      if (btn.textContent === 'Sending...') btn.textContent = 'Send Reset Link';
+      if (btn.textContent === 'Sending...') btn.textContent = 'Send Code';
     }
   });
 
-  // ── Reset Password: set new password (after clicking email link) ──
-  let resetTokens = null;
-
-  // Listen for deep-link tokens from main process
-  if (window.socialAPI.onShowResetForm) {
-    window.socialAPI.onShowResetForm((tokens) => {
-      resetTokens = tokens;
-      showPanel(resetForm);
-    });
-  }
-
+  // ── Reset Password: verify OTP + set new password ──
   document.getElementById('reset-btn').addEventListener('click', async () => {
+    const otp = document.getElementById('reset-otp').value.trim();
     const password = document.getElementById('reset-password').value;
     const confirm = document.getElementById('reset-password-confirm').value;
     const errEl = document.getElementById('reset-error');
@@ -203,6 +199,11 @@ document.addEventListener('DOMContentLoaded', () => {
     errEl.classList.add('hidden');
     successEl.classList.add('hidden');
 
+    if (!otp || otp.length < 6) {
+      errEl.textContent = 'Please enter the 6-digit code from your email';
+      errEl.classList.remove('hidden');
+      return;
+    }
     if (!password || password.length < 6) {
       errEl.textContent = 'Password must be at least 6 characters';
       errEl.classList.remove('hidden');
@@ -213,8 +214,8 @@ document.addEventListener('DOMContentLoaded', () => {
       errEl.classList.remove('hidden');
       return;
     }
-    if (!resetTokens) {
-      errEl.textContent = 'Reset session expired. Please request a new reset link.';
+    if (!resetEmail) {
+      errEl.textContent = 'Session expired. Please go back and request a new code.';
       errEl.classList.remove('hidden');
       return;
     }
@@ -224,18 +225,14 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.textContent = 'Updating...';
 
     try {
-      const result = await window.socialAPI.resetPassword(
-        resetTokens.access_token,
-        resetTokens.refresh_token,
-        password
-      );
+      const result = await window.socialAPI.resetPassword(resetEmail, otp, password);
       if (result.error) {
         errEl.textContent = result.error;
         errEl.classList.remove('hidden');
       } else {
         successEl.classList.remove('hidden');
         btn.textContent = 'Updated!';
-        resetTokens = null;
+        resetEmail = '';
         // Auto-switch to login after 2s
         setTimeout(() => showPanel(loginForm), 2000);
       }

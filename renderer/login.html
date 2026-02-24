@@ -32,19 +32,21 @@
     <!-- Forgot Password: enter email -->
     <div id="forgot-form" class="form-panel hidden">
       <h2>Reset Password</h2>
-      <p class="hint">Enter your email and we'll send a reset link.</p>
+      <p class="hint">Enter your email and we'll send a 6-digit code.</p>
       <input type="email" id="forgot-email" placeholder="Email" autocomplete="email" />
-      <button id="forgot-btn" class="primary-btn">Send Reset Link</button>
-      <div id="forgot-sent" class="success-msg hidden">Check your email and click the reset link. The app will open automatically.</div>
+      <button id="forgot-btn" class="primary-btn">Send Code</button>
+      <div id="forgot-sent" class="success-msg hidden">Code sent! Check your email for a 6-digit code.</div>
       <div class="switch-text">
         <a href="#" id="forgot-back-login">Back to sign in</a>
       </div>
       <div id="forgot-error" class="error hidden"></div>
     </div>
 
-    <!-- New Password: shown after clicking email link -->
+    <!-- Enter OTP + New Password -->
     <div id="reset-form" class="form-panel hidden">
       <h2>Set New Password</h2>
+      <p class="hint">Enter the 6-digit code from your email.</p>
+      <input type="text" id="reset-otp" placeholder="6-digit code" maxlength="6" autocomplete="one-time-code" style="text-align:center; letter-spacing:4px; font-size:16px;" />
       <input type="password" id="reset-password" placeholder="New password (min 6 chars)" autocomplete="new-password" />
       <input type="password" id="reset-password-confirm" placeholder="Confirm new password" autocomplete="new-password" />
       <button id="reset-btn" class="primary-btn">Update Password</button>

@@ -8,10 +8,8 @@ contextBridge.exposeInMainWorld('socialAPI', {
     ipcRenderer.invoke('social-sign-in', email, password),
   signOut: () => ipcRenderer.invoke('social-sign-out'),
   sendPasswordReset: (email) => ipcRenderer.invoke('social-send-reset', email),
-  resetPassword: (accessToken, refreshToken, newPassword) =>
-    ipcRenderer.invoke('social-reset-password', accessToken, refreshToken, newPassword),
-  onShowResetForm: (callback) =>
-    ipcRenderer.on('show-reset-form', (event, tokens) => callback(tokens)),
+  resetPassword: (email, otpCode, newPassword) =>
+    ipcRenderer.invoke('social-reset-password', email, otpCode, newPassword),
   getProfile: () => ipcRenderer.invoke('social-get-profile'),
   isLoggedIn: () => ipcRenderer.invoke('social-is-logged-in'),
 

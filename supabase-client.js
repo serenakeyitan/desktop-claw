@@ -231,39 +231,37 @@ async function getMyProfile() {
   return data;
 }
 
-// ── password reset ─────────────────────────────────────────────────────────
+// ── password reset (OTP-based, no link clicking needed) ───────────────────
 
 /**
- * Send a password-reset email.  The link in the email will redirect to
- * alldaypoke://reset#access_token=…&refresh_token=… so the desktop app
- * can catch it via deep-link and let the user set a new password in-app.
+ * Send a password-reset email containing a 6-digit OTP code.
  */
 async function sendPasswordReset(email) {
   const sb = getSupabase();
   if (!sb) throw new Error('Supabase not configured');
 
-  const { error } = await sb.auth.resetPasswordForEmail(email, {
-    redirectTo: 'alldaypoke://reset',
-  });
+  const { error } = await sb.auth.resetPasswordForEmail(email);
   if (error) throw error;
 }
 
 /**
- * After catching the deep-link tokens, restore a session and then
- * update the user's password.
+ * Verify the 6-digit OTP code from the reset email, then set a new password.
+ * Step 1: verifyOtp with type 'recovery' → creates a session
+ * Step 2: updateUser with new password
  */
-async function resetPassword(accessToken, refreshToken, newPassword) {
+async function resetPassword(email, otpCode, newPassword) {
   const sb = getSupabase();
   if (!sb) throw new Error('Supabase not configured');
 
-  // Set the session from the reset-link tokens
-  const { error: sessionErr } = await sb.auth.setSession({
-    access_token: accessToken,
-    refresh_token: refreshToken,
+  // Verify the OTP code — this logs the user in with a recovery session
+  const { data, error: otpErr } = await sb.auth.verifyOtp({
+    email,
+    token: otpCode,
+    type: 'recovery',
   });
-  if (sessionErr) throw sessionErr;
+  if (otpErr) throw otpErr;
 
-  // Update password
+  // Update password using the recovery session
   const { error: updateErr } = await sb.auth.updateUser({
     password: newPassword,
   });
