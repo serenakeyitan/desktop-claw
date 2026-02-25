@@ -278,10 +278,13 @@ function setupIPC() {
     if (!sessionText) return;
 
     if (data.count > 0) {
-      // Sort busy first, then show up to 3
-      const sorted = [...data.sessions].sort((a, b) => (b.busy ? 1 : 0) - (a.busy ? 1 : 0));
-      const shown = sorted.slice(0, 3);
-      const shownBusy = shown.filter(s => s.busy).length;
+      // Sort busy first, then by project name
+      const sorted = [...data.sessions].sort((a, b) => {
+        if (b.busy !== a.busy) return (b.busy ? 1 : 0) - (a.busy ? 1 : 0);
+        return (a.project || '').localeCompare(b.project || '');
+      });
+      const shown = sorted.slice(0, 5);
+      const totalBusy = data.busyCount;
 
       const items = shown.map(s => {
         const name = s.project || 'unknown';
@@ -291,17 +294,16 @@ function setupIPC() {
         return `<span class="session-idle">${name}</span>`;
       });
 
-      const dotClass = shownBusy > 0 ? 'session-dot busy' : 'session-dot idle';
-      const summary = shownBusy > 0
-        ? `${shownBusy} running`
-        : `${shown.length} idle`;
+      const extra = data.count > shown.length ? ` +${data.count - shown.length}` : '';
+      const dotClass = totalBusy > 0 ? 'session-dot busy' : 'session-dot idle';
+      const summary = `${data.count} session${data.count !== 1 ? 's' : ''}`;
 
       sessionText.innerHTML =
-        `<span class="${dotClass}"></span>${summary}: ${items.join(', ')}`;
+        `<span class="${dotClass}"></span>${summary}: ${items.join(', ')}${extra}`;
 
       // Update robot face based on session activity
       if (robot) {
-        robot.setState(shownBusy > 0 ? 'active' : 'idle');
+        robot.setState(totalBusy > 0 ? 'active' : 'idle');
       }
     } else {
       sessionText.innerHTML = '';
