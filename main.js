@@ -218,8 +218,8 @@ function createMainWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
-  // Set up click-through for transparency
-  mainWindow.setIgnoreMouseEvents(false);
+  // Click-through: ignore mouse on transparent areas, forward events so renderer can detect hover
+  mainWindow.setIgnoreMouseEvents(true, { forward: true });
 
   // Initialize services
   initializeServices();
@@ -1302,6 +1302,17 @@ app.on('activate', () => {
       createSetupWindow();
     } else {
       createMainWindow();
+    }
+  }
+});
+
+// Toggle click-through for transparent areas
+ipcMain.handle('set-ignore-mouse-events', (event, ignore, opts) => {
+  if (mainWindow) {
+    if (ignore) {
+      mainWindow.setIgnoreMouseEvents(true, { forward: true });
+    } else {
+      mainWindow.setIgnoreMouseEvents(false);
     }
   }
 });

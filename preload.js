@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openConfig: () => ipcRenderer.invoke('open-config'),
 
   // Window management
+  setIgnoreMouseEvents: (ignore) => ipcRenderer.invoke('set-ignore-mouse-events', ignore),
   setWindowPosition: (position) => ipcRenderer.invoke('set-window-position', position),
   saveRobotScale: (scale) => ipcRenderer.invoke('save-robot-scale', scale),
   showContextMenu: () => ipcRenderer.invoke('show-context-menu'),

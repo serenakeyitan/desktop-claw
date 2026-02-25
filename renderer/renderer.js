@@ -67,6 +67,68 @@ function setupEventListeners() {
   document.addEventListener('selectstart', (e) => {
     e.preventDefault();
   });
+
+  // ── Click-through: only catch mouse on visible elements ──
+  // When mouse is over transparent area → ignore (click-through to desktop)
+  // When mouse is over robot/bubble → capture events
+  setupClickThrough();
+}
+
+function setupClickThrough() {
+  let isMouseOverContent = false;
+  const bubble = document.getElementById('bubble');
+  const robotContainer = document.getElementById('robot-container');
+
+  // Check if mouse is over the robot body (the only primary hit target)
+  function isOverRobot(e) {
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (!el || el === document.body || el === document.documentElement) return false;
+
+    // Robot container or anything inside it (SVG pixels, resize handle)
+    if (robotContainer && robotContainer.contains(el)) return true;
+    // Poke overlay elements (hand, msg, hearts) — positioned outside robot
+    if (el.closest && (el.closest('.poke-hand') || el.closest('.poke-msg'))) return true;
+    return false;
+  }
+
+  // Check if mouse is over the visible bubble (only when it's shown)
+  function isOverBubble(e) {
+    if (!bubble || !bubble.classList.contains('visible')) return false;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    return el && bubble.contains(el);
+  }
+
+  document.addEventListener('mousemove', (e) => {
+    const overRobot = isOverRobot(e);
+    const overBubble = isOverBubble(e);
+    const overContent = overRobot || overBubble;
+
+    // Toggle bubble visibility: show only when hovering robot or bubble itself
+    if (bubble) {
+      if (overRobot || overBubble) {
+        bubble.classList.add('visible');
+      } else {
+        bubble.classList.remove('visible');
+      }
+    }
+
+    // Toggle click-through
+    if (overContent && !isMouseOverContent) {
+      isMouseOverContent = true;
+      window.electronAPI.setIgnoreMouseEvents(false);
+    } else if (!overContent && isMouseOverContent && !isDragging && !isResizing) {
+      isMouseOverContent = false;
+      window.electronAPI.setIgnoreMouseEvents(true);
+    }
+  });
+
+  document.addEventListener('mouseleave', () => {
+    if (!isDragging && !isResizing) {
+      isMouseOverContent = false;
+      window.electronAPI.setIgnoreMouseEvents(true);
+    }
+    if (bubble) bubble.classList.remove('visible');
+  });
 }
 
 function handleDragStart(e) {
@@ -102,6 +164,9 @@ function handleDragEnd(e) {
 
   isDragging = false;
   document.body.classList.remove('dragging');
+
+  // Re-check if we should go back to click-through mode
+  // (mouse may have moved off the robot during drag)
 }
 
 // ── Robot scale handling ──

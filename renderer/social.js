@@ -405,12 +405,10 @@ function setupProfileModal() {
   const modal = document.getElementById('profile-modal');
   const closeBtn = document.getElementById('profile-close-btn');
   const saveBtn = document.getElementById('profile-save-btn');
-  const usernameEl = document.getElementById('username');
+  const editBtn = document.getElementById('edit-profile-btn');
 
-  // Click username to open profile settings
-  usernameEl.style.cursor = 'pointer';
-  usernameEl.title = 'Edit profile';
-  usernameEl.addEventListener('click', async () => {
+  // Click "Edit" button to open profile settings
+  editBtn.addEventListener('click', async () => {
     if (!myProfile) await loadProfile();
     if (myProfile) {
       document.getElementById('profile-display-name').value = myProfile.display_name || '';
@@ -450,6 +448,8 @@ function setupProfileModal() {
         resultEl.classList.remove('hidden');
         myProfile = res.profile || { ...myProfile, ...updates };
         document.getElementById('username').textContent = myProfile.display_name || myProfile.username;
+        // Refresh ranking to show updated social icons
+        loadData();
         setTimeout(() => modal.classList.add('hidden'), 1000);
       }
     } catch (err) {
@@ -510,6 +510,8 @@ async function buildLocalSelfRanking(period) {
       username: profile?.username || 'You',
       display_name: profile?.display_name || profile?.username || 'You',
       subscription_tier: tier,
+      twitter_username: profile?.twitter_username || null,
+      github_username: profile?.github_username || null,
       total_usage: total.totalDelta || 0,
       total_time_ms: total.totalTimeMs || 0,
       log_count: localData?.ranking?.reduce((sum, r) => sum + (r.sessionCount || 0), 0) || 0,

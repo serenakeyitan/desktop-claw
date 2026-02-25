@@ -26,7 +26,6 @@ body {
   justify-content: flex-end;
   padding: 10px;
   position: relative;
-  -webkit-app-region: drag;
 }
 
 /* ── Hover Bubble ── */
@@ -41,8 +40,8 @@ body {
   z-index: 10;
 }
 
-/* Show bubble on hover over the whole widget */
-#widget-container:hover #bubble {
+/* Show bubble when robot is hovered (toggled via JS) */
+#bubble.visible {
   opacity: 1;
   pointer-events: auto;
 }
@@ -217,7 +216,6 @@ body {
   align-items: center;
   justify-content: center;
   position: relative;
-  -webkit-app-region: no-drag;
   cursor: pointer;
   transform-origin: center bottom;
   transition: transform 0.1s ease;
@@ -232,7 +230,6 @@ body {
   width: 12px;
   height: 12px;
   cursor: nwse-resize;
-  -webkit-app-region: no-drag;
   z-index: 50;
   opacity: 0;
   transition: opacity 0.2s;
