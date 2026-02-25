@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ── All Day Poke Installer ───────────────────────────────────────────────────
-# Usage: curl -fsSL https://alldaypoke.com/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/serenakeyitan/desktop-claw/main/install.sh | bash
 # ─────────────────────────────────────────────────────────────────────────
 
 REPO="https://github.com/serenakeyitan/desktop-claw.git"
