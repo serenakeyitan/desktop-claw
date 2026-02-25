@@ -286,24 +286,23 @@ function setupIPC() {
       const shown = sorted.slice(0, 5);
       const totalBusy = data.busyCount;
 
+      // All detected sessions are live (process exists). Use "session-live"
+      // for all, with "session-active" added for busy ones (executing a task).
       const items = shown.map(s => {
         const name = s.project || 'unknown';
-        if (s.busy) {
-          return `<span class="session-busy">${name}</span>`;
-        }
-        return `<span class="session-idle">${name}</span>`;
+        const cls = s.busy ? 'session-live session-active' : 'session-live';
+        return `<span class="${cls}">${name}</span>`;
       });
 
       const extra = data.count > shown.length ? ` +${data.count - shown.length}` : '';
-      const dotClass = totalBusy > 0 ? 'session-dot busy' : 'session-dot idle';
-      const summary = `${data.count} session${data.count !== 1 ? 's' : ''}`;
+      const summary = `${data.count} running`;
 
       sessionText.innerHTML =
-        `<span class="${dotClass}"></span>${summary}: ${items.join(', ')}${extra}`;
+        `<span class="session-dot busy"></span>${summary}: ${items.join(', ')}${extra}`;
 
-      // Update robot face based on session activity
+      // Update robot face — active if any sessions exist
       if (robot) {
-        robot.setState(totalBusy > 0 ? 'active' : 'idle');
+        robot.setState('active');
       }
     } else {
       sessionText.innerHTML = '';
