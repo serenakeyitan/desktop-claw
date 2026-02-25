@@ -49,6 +49,9 @@ const MIN_BUSY_DURATION_MS = 30 * 1000; // 30 seconds
 const FRESHNESS_THRESHOLD_SEC = 120;
 
 // Claude debug directory
+// Cooldown (ms) before the same project can trigger another "task finished" notification.
+const NOTIFICATION_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+
 const CLAUDE_DEBUG_DIR = path.join(os.homedir(), '.claude', 'debug');
 
 class SessionMonitor extends EventEmitter {
@@ -58,6 +61,8 @@ class SessionMonitor extends EventEmitter {
     this.pollTimer = null;
     // Map of sessionId (debug file UUID or PID) -> session info
     this.sessions = new Map();
+    // Map of project name -> last notification timestamp (cooldown tracking)
+    this.lastNotifiedAt = new Map();
   }
 
   /**
@@ -456,6 +461,7 @@ class SessionMonitor extends EventEmitter {
           cpuDelta: 0,
           busy: sess.remote ? true : false, // remote sessions assumed busy
           idlePolls: 0,
+          busyPolls: 0, // consecutive busy polls — need several before transitions count
           busySince: sess.remote ? new Date() : null,
         };
         this.sessions.set(sess.id, session);
@@ -485,9 +491,16 @@ class SessionMonitor extends EventEmitter {
 
           if (isIdle) {
             existing.idlePolls = (existing.idlePolls || 0) + 1;
+            existing.busyPolls = 0;
           } else {
             existing.idlePolls = 0;
+            existing.busyPolls = (existing.busyPolls || 0) + 1;
           }
+
+          // Require at least 3 consecutive busy polls before marking as busy.
+          // This prevents single-poll CPU spikes from triggering a false
+          // busy→idle notification cycle.
+          const BUSY_CONFIRM_POLLS = 3;
 
           if (wasActive && existing.idlePolls >= IDLE_CONFIRM_POLLS) {
             // Transition: busy -> idle (task finished)
@@ -501,19 +514,29 @@ class SessionMonitor extends EventEmitter {
             existing.busySince = null;
 
             if (busyMs >= MIN_BUSY_DURATION_MS) {
-              log(`Session task finished: ${existing.project || existing.id} (ran for ${busyDuration})`);
-              this.emit('session-task-finished', {
-                id: existing.id,
-                pid: existing.pid,
-                project: existing.project,
-                cwd: existing.cwd,
-                busyDuration,
-              });
+              // Check cooldown — don't spam notifications for the same project
+              const projectKey = existing.project || existing.id;
+              const lastNotified = this.lastNotifiedAt.get(projectKey) || 0;
+              const sinceLast = Date.now() - lastNotified;
+
+              if (sinceLast >= NOTIFICATION_COOLDOWN_MS) {
+                this.lastNotifiedAt.set(projectKey, Date.now());
+                log(`Session task finished: ${projectKey} (ran for ${busyDuration})`);
+                this.emit('session-task-finished', {
+                  id: existing.id,
+                  pid: existing.pid,
+                  project: existing.project,
+                  cwd: existing.cwd,
+                  busyDuration,
+                });
+              } else {
+                log(`Session task finished: ${projectKey} (ran for ${busyDuration}) — notification suppressed (cooldown ${Math.round(sinceLast / 1000)}s < ${NOTIFICATION_COOLDOWN_MS / 1000}s)`);
+              }
             } else {
               log(`Session idle: ${existing.project || existing.id} (busy only ${busyDuration}, skipping notification)`);
             }
-          } else if (!wasActive && !isIdle) {
-            // Transition: idle -> busy (task started)
+          } else if (!wasActive && !isIdle && existing.busyPolls >= BUSY_CONFIRM_POLLS) {
+            // Transition: idle -> busy (task started) — confirmed by sustained CPU usage
             existing.busy = true;
             existing.idlePolls = 0;
             existing.busySince = new Date();
