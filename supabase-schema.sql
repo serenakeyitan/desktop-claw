@@ -15,6 +15,10 @@ create table if not exists public.profiles (
 -- Migration: add subscription_tier if the table already exists
 alter table public.profiles add column if not exists subscription_tier text default 'pro';
 
+-- Migration: add social profile links
+alter table public.profiles add column if not exists twitter_username text;
+alter table public.profiles add column if not exists github_username text;
+
 -- Enable RLS
 alter table public.profiles enable row level security;
 
@@ -222,6 +226,8 @@ begin
         p.username,
         p.display_name,
         p.subscription_tier,
+        p.twitter_username,
+        p.github_username,
         coalesce(sum(ul.delta_percent), 0) as total_usage,
         coalesce(sum(ul.active_time_ms), 0) as total_time_ms,
         count(ul.id) as log_count,
@@ -237,7 +243,7 @@ begin
          or p.id in (
            select friend_id from public.friendships where user_id = current_user_id
          )
-      group by p.id, p.username, p.display_name, p.subscription_tier, us.is_vibing, us.current_project, us.last_active_at
+      group by p.id, p.username, p.display_name, p.subscription_tier, p.twitter_username, p.github_username, us.is_vibing, us.current_project, us.last_active_at
       order by coalesce(sum(ul.delta_percent), 0) desc
     ) r
   );
@@ -266,6 +272,8 @@ begin
         p.username,
         p.display_name,
         p.subscription_tier,
+        p.twitter_username,
+        p.github_username,
         coalesce(sum(ul.delta_percent), 0) as total_usage,
         coalesce(sum(ul.active_time_ms), 0) as total_time_ms,
         count(ul.id) as log_count,
@@ -276,7 +284,7 @@ begin
         on ul.user_id = p.id and ul.date >= cutoff
       left join public.user_status us
         on us.user_id = p.id
-      group by p.id, p.username, p.display_name, p.subscription_tier, us.is_vibing, us.last_active_at
+      group by p.id, p.username, p.display_name, p.subscription_tier, p.twitter_username, p.github_username, us.is_vibing, us.last_active_at
       order by coalesce(sum(ul.delta_percent), 0) desc
       limit lim
     ) r

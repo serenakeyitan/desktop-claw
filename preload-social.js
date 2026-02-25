@@ -2,8 +2,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('socialAPI', {
   // Auth
-  signUp: (email, password, username) =>
-    ipcRenderer.invoke('social-sign-up', email, password, username),
+  signUp: (email, password, username, twitter, github) =>
+    ipcRenderer.invoke('social-sign-up', email, password, username, twitter, github),
   signIn: (email, password) =>
     ipcRenderer.invoke('social-sign-in', email, password),
   signOut: () => ipcRenderer.invoke('social-sign-out'),
@@ -11,7 +11,9 @@ contextBridge.exposeInMainWorld('socialAPI', {
   resetPassword: (email, otpCode, newPassword) =>
     ipcRenderer.invoke('social-reset-password', email, otpCode, newPassword),
   getProfile: () => ipcRenderer.invoke('social-get-profile'),
+  updateProfile: (updates) => ipcRenderer.invoke('social-update-profile', updates),
   isLoggedIn: () => ipcRenderer.invoke('social-is-logged-in'),
+  openExternal: (url) => ipcRenderer.invoke('open-external-url', url),
 
   // Friends
   addFriend: (code) => ipcRenderer.invoke('social-add-friend', code),

@@ -115,6 +115,8 @@ function applyRobotScale(scale) {
   const container = document.getElementById('robot-container');
   if (container) {
     container.style.transform = `scale(${robotScale})`;
+    // Expose scale so robot.js can counter-scale poke overlays
+    container.dataset.scale = robotScale;
   }
   // Keep bubble sitting just above the visible robot
   // Robot container is 64px tall, transform-origin is center bottom

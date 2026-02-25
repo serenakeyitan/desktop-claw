@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupPeriodTabs();
   setupAddFriend();
   setupInviteModal();
+  setupProfileModal();
   setupSignOut();
   loadData();
 });
@@ -205,7 +206,7 @@ function renderRanking(data) {
     row.innerHTML = `
       <span class="col-rank">${rank}</span>
       <div class="user-cell col-user">
-        <span class="display-name">${escapeHtml(item.display_name || item.username || '???')}${tierLabel ? ` <span class="tier-badge tier-${item.subscription_tier}">${tierLabel}</span>` : ''}</span>
+        <span class="display-name">${escapeHtml(item.display_name || item.username || '???')}${tierLabel ? ` <span class="tier-badge tier-${item.subscription_tier}">${tierLabel}</span>` : ''}${buildSocialIcons(item)}</span>
         <div class="user-bar"><div class="user-bar-fill" style="width: ${barWidth}%"></div></div>
       </div>
       <span class="col-usage"><span class="usage-val">${usageStr}</span></span>
@@ -217,6 +218,9 @@ function renderRanking(data) {
       </span>
       <span class="col-poke">${showPoke ? `<button class="poke-btn" data-uid="${item.user_id}" title="Poke ${escapeHtml(item.display_name || item.username)}">Poke</button>` : ''}</span>
     `;
+
+    // Attach social icon click handlers
+    attachSocialIconHandlers(row);
 
     // Attach poke handler
     if (showPoke) {
@@ -296,7 +300,7 @@ function renderStatusList(data) {
     card.innerHTML = `
       <div class="status-avatar">${initial}</div>
       <div class="status-info">
-        <div class="status-name">${escapeHtml(item.display_name || item.username || '???')}</div>
+        <div class="status-name">${escapeHtml(item.display_name || item.username || '???')}${buildSocialIcons(item)}</div>
         <div class="status-detail ${isVibing ? 'vibing' : ''}">
           ${isVibing
             ? `Vibing${project ? ' on ' + escapeHtml(project) : ''}`
@@ -309,6 +313,7 @@ function renderStatusList(data) {
       </span>
     `;
 
+    attachSocialIconHandlers(card);
     fragment.appendChild(card);
   }
 
@@ -394,6 +399,70 @@ function setupInviteModal() {
   });
 }
 
+// ── Profile Settings Modal ───────────────────────────────────────────────
+
+function setupProfileModal() {
+  const modal = document.getElementById('profile-modal');
+  const closeBtn = document.getElementById('profile-close-btn');
+  const saveBtn = document.getElementById('profile-save-btn');
+  const usernameEl = document.getElementById('username');
+
+  // Click username to open profile settings
+  usernameEl.style.cursor = 'pointer';
+  usernameEl.title = 'Edit profile';
+  usernameEl.addEventListener('click', async () => {
+    if (!myProfile) await loadProfile();
+    if (myProfile) {
+      document.getElementById('profile-display-name').value = myProfile.display_name || '';
+      document.getElementById('profile-twitter').value = myProfile.twitter_username || '';
+      document.getElementById('profile-github').value = myProfile.github_username || '';
+    }
+    document.getElementById('profile-result').classList.add('hidden');
+    modal.classList.remove('hidden');
+  });
+
+  closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.classList.add('hidden');
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const resultEl = document.getElementById('profile-result');
+    resultEl.classList.add('hidden');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+
+    const updates = {
+      display_name: document.getElementById('profile-display-name').value.trim(),
+      twitter_username: document.getElementById('profile-twitter').value.trim().replace(/^@/, ''),
+      github_username: document.getElementById('profile-github').value.trim().replace(/^@/, ''),
+    };
+
+    try {
+      const res = await window.socialAPI.updateProfile(updates);
+      if (res.error) {
+        resultEl.textContent = res.error;
+        resultEl.className = 'error';
+        resultEl.classList.remove('hidden');
+      } else {
+        resultEl.textContent = 'Profile saved!';
+        resultEl.className = 'success';
+        resultEl.classList.remove('hidden');
+        myProfile = res.profile || { ...myProfile, ...updates };
+        document.getElementById('username').textContent = myProfile.display_name || myProfile.username;
+        setTimeout(() => modal.classList.add('hidden'), 1000);
+      }
+    } catch (err) {
+      resultEl.textContent = err.message || 'Failed to save';
+      resultEl.className = 'error';
+      resultEl.classList.remove('hidden');
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
+    }
+  });
+}
+
 // ── Sign Out ────────────────────────────────────────────────────────────────
 
 function setupSignOut() {
@@ -464,6 +533,33 @@ async function buildLocalSelfRanking(period) {
       last_active_at: new Date().toISOString(),
     }];
   }
+}
+
+// ── Social Icons Helper ──────────────────────────────────────────────────────
+
+function buildSocialIcons(item) {
+  let html = '';
+  if (item.twitter_username || item.github_username) {
+    html += '<span class="social-icons">';
+    if (item.twitter_username) {
+      html += `<span class="social-icon-link twitter-icon" data-url="https://x.com/${encodeURIComponent(item.twitter_username)}" title="@${escapeHtml(item.twitter_username)} on X">\ud835\udd4f</span>`;
+    }
+    if (item.github_username) {
+      html += `<span class="social-icon-link github-icon" data-url="https://github.com/${encodeURIComponent(item.github_username)}" title="${escapeHtml(item.github_username)} on GitHub">GH</span>`;
+    }
+    html += '</span>';
+  }
+  return html;
+}
+
+function attachSocialIconHandlers(container) {
+  container.querySelectorAll('.social-icon-link').forEach(icon => {
+    icon.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const url = icon.dataset.url;
+      if (url) window.socialAPI.openExternal(url);
+    });
+  });
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────

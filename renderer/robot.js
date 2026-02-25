@@ -161,17 +161,23 @@ class PixelRobot {
     if (this._patting) return; // don't stack
     this._patting = true;
 
+    // Counter-scale so overlays stay a fixed readable size regardless of robot scale
+    const containerScale = parseFloat(this.container.dataset.scale) || 1;
+    const counterScale = 1 / containerScale;
+
     // Show headpat gif above the robot
     const hand = document.createElement('img');
     hand.className = 'poke-hand';
     hand.src = '../headpat.gif';
     hand.draggable = false;
+    hand.style.transform = `translateX(-50%) scale(${counterScale})`;
     this.container.appendChild(hand);
 
     // Show "poked by X" message bubble
     const msg = document.createElement('div');
     msg.className = 'poke-msg';
     msg.textContent = senderName ? `${senderName} poked you!` : 'Poked!';
+    msg.style.transform = `translateX(-50%) scale(${counterScale})`;
     this.container.appendChild(msg);
 
     // Add pat-head class to SVG for squish animation
@@ -198,13 +204,14 @@ class PixelRobot {
       pixel.setAttribute('fill', '#e8956e');
     });
 
-    // Float hearts up from the robot
+    // Float hearts up from the robot (counter-scaled for fixed size)
     for (let i = 0; i < 3; i++) {
       const heart = document.createElement('div');
       heart.className = 'poke-heart';
       heart.textContent = '♥';
       heart.style.left = `${30 + i * 25}%`;
       heart.style.animationDelay = `${i * 0.4}s`;
+      heart.style.fontSize = `${16 * counterScale}px`;
       this.container.appendChild(heart);
       setTimeout(() => heart.remove(), 3000);
     }

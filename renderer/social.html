@@ -61,6 +61,34 @@
       <div id="friend-result" class="hidden"></div>
     </div>
 
+    <!-- Profile Settings Modal -->
+    <div id="profile-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-title">PROFILE SETTINGS</div>
+        <div class="profile-field">
+          <label>Display Name</label>
+          <input type="text" id="profile-display-name" placeholder="Display name" />
+        </div>
+        <div class="profile-field">
+          <label>X / Twitter</label>
+          <div class="profile-social-input">
+            <span class="profile-social-prefix">@</span>
+            <input type="text" id="profile-twitter" placeholder="username" />
+          </div>
+        </div>
+        <div class="profile-field">
+          <label>GitHub</label>
+          <div class="profile-social-input">
+            <span class="profile-social-prefix">@</span>
+            <input type="text" id="profile-github" placeholder="username" />
+          </div>
+        </div>
+        <button id="profile-save-btn" class="action-btn">Save</button>
+        <div id="profile-result" class="hidden"></div>
+        <button id="profile-close-btn" class="small-link">Close</button>
+      </div>
+    </div>
+
     <!-- Invite Code Modal -->
     <div id="invite-modal" class="modal hidden">
       <div class="modal-content">

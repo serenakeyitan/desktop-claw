@@ -125,7 +125,7 @@ async function restoreSession() {
 /**
  * Sign up with email + password.  Creates a profile row automatically.
  */
-async function signUp(email, password, username) {
+async function signUp(email, password, username, twitterUsername, githubUsername) {
   const sb = getSupabase();
   if (!sb) throw new Error('Supabase not configured');
 
@@ -146,12 +146,16 @@ async function signUp(email, password, username) {
   // Create profile row (invite code generated server-side via default/trigger,
   // but we can also generate one client-side as a fallback)
   const inviteCode = generateInviteCode();
-  const { error: profileErr } = await sb.from('profiles').insert({
+  const profileRow = {
     id: user.id,
     username,
     display_name: username,
     invite_code: inviteCode,
-  });
+  };
+  if (twitterUsername) profileRow.twitter_username = twitterUsername;
+  if (githubUsername) profileRow.github_username = githubUsername;
+
+  const { error: profileErr } = await sb.from('profiles').insert(profileRow);
 
   if (profileErr) {
     console.error('supabase-client: profile insert failed', profileErr.message);
@@ -231,6 +235,33 @@ async function getMyProfile() {
   return data;
 }
 
+/**
+ * Update the logged-in user's profile fields (display_name, twitter, github, etc.)
+ */
+async function updateProfile(updates) {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase not configured');
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Not logged in');
+
+  // Only allow known fields
+  const allowed = ['display_name', 'twitter_username', 'github_username'];
+  const safe = {};
+  for (const key of allowed) {
+    if (key in updates) safe[key] = updates[key] || null;
+  }
+
+  const { data, error } = await sb
+    .from('profiles')
+    .update(safe)
+    .eq('id', user.id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 // ── password reset (OTP-based, no link clicking needed) ───────────────────
 
 /**
@@ -293,6 +324,7 @@ module.exports = {
   signOut,
   getCurrentUser,
   getMyProfile,
+  updateProfile,
   sendPasswordReset,
   resetPassword,
   saveConfig,

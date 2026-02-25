@@ -778,9 +778,9 @@ async function startSocialSync() {
 
 // ── Social IPC handlers ─────────────────────────────────────────────────
 
-ipcMain.handle('social-sign-up', async (event, email, password, username) => {
+ipcMain.handle('social-sign-up', async (event, email, password, username, twitter, github) => {
   try {
-    const result = await supabaseClient.signUp(email, password, username);
+    const result = await supabaseClient.signUp(email, password, username, twitter, github);
     // Start sync after signup
     await startSocialSync();
     // Process pending invite code from deep link (auto-add friend)
@@ -867,6 +867,23 @@ ipcMain.handle('social-is-logged-in', async () => {
 
 ipcMain.handle('social-get-profile', async () => {
   return await supabaseClient.getMyProfile();
+});
+
+ipcMain.handle('social-update-profile', async (event, updates) => {
+  try {
+    const profile = await supabaseClient.updateProfile(updates);
+    return { success: true, profile };
+  } catch (err) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('open-external-url', async (event, url) => {
+  const { shell } = require('electron');
+  // Only allow http/https URLs for safety
+  if (url && (url.startsWith('https://') || url.startsWith('http://'))) {
+    shell.openExternal(url);
+  }
 });
 
 ipcMain.handle('social-add-friend', async (event, code) => {

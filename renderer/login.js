@@ -79,11 +79,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const username = document.getElementById('signup-username').value.trim();
     const email = document.getElementById('signup-email').value.trim();
     const password = document.getElementById('signup-password').value;
+    const twitterUsername = document.getElementById('signup-twitter').value.trim().replace(/^@/, '');
+    const githubUsername = document.getElementById('signup-github').value.trim().replace(/^@/, '');
     const errEl = document.getElementById('signup-error');
     errEl.classList.add('hidden');
 
     if (!username || !email || !password) {
-      errEl.textContent = 'All fields are required';
+      errEl.textContent = 'Username, email, and password are required';
       errEl.classList.remove('hidden');
       return;
     }
@@ -98,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.textContent = 'Creating account...';
 
     try {
-      const result = await window.socialAPI.signUp(email, password, username);
+      const result = await window.socialAPI.signUp(email, password, username, twitterUsername, githubUsername);
       if (result.error) {
         errEl.textContent = result.error;
         errEl.classList.remove('hidden');
