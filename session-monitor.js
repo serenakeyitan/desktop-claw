@@ -6,7 +6,9 @@
  * 1. PRIMARY: Scans ~/.claude/debug/*.txt for recently-modified files.
  *    Each debug file corresponds to one Claude Code session and contains
  *    the project path in its first few lines. A file modified within the
- *    last FRESHNESS_THRESHOLD_SEC seconds is considered active.
+ *    last FRESHNESS_THRESHOLD_SEC seconds is considered active. Sessions
+ *    are keyed by CWD (not debug file UUID) so new debug files for the
+ *    same project are recognized as the same session, preventing flicker.
  *
  * 2. SUPPLEMENT: Uses `ps` to get CPU time for each detected session,
  *    enabling busy/idle tracking via cumulative CPU time deltas.
@@ -48,10 +50,15 @@ const MIN_BUSY_DURATION_MS = 30 * 1000; // 30 seconds
 // Set to 2 minutes to be generous — active sessions write debug output frequently.
 const FRESHNESS_THRESHOLD_SEC = 120;
 
-// Claude debug directory
+// Number of consecutive polls where a session is "missing" before we remove it.
+// With 5s polling this means ~60s of sustained absence before removal.
+// This prevents flickering when debug files hover around the freshness threshold.
+const MISSING_CONFIRM_POLLS = 12;
+
 // Cooldown (ms) before the same project can trigger another "task finished" notification.
 const NOTIFICATION_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
 
+// Claude debug directory
 const CLAUDE_DEBUG_DIR = path.join(os.homedir(), '.claude', 'debug');
 
 class SessionMonitor extends EventEmitter {
@@ -361,7 +368,10 @@ class SessionMonitor extends EventEmitter {
    * 2. Process scanning → catches idle sessions with stale debug files
    * 3. SSH connections → detects remote sessions on other machines
    *
-   * Sessions are deduplicated by cwd/host to avoid double-counting.
+   * Sessions are keyed by CWD (project path) to prevent flickering when
+   * debug file UUIDs change across Claude Code restarts within the same project.
+   * Sessions are not removed immediately — they require MISSING_CONFIRM_POLLS
+   * consecutive absent polls before being considered truly ended.
    */
   poll() {
     const debugSessions = this.scanDebugFiles();
@@ -375,7 +385,8 @@ class SessionMonitor extends EventEmitter {
     for (const ds of debugSessions) {
       const key = ds.cwd || ds.sessionId;
       sessionMap.set(key, {
-        id: ds.sessionId,
+        id: key, // Use cwd as the stable session key (not UUID)
+        debugId: ds.sessionId,
         cwd: ds.cwd,
         project: ds.project,
         mtime: ds.mtime,
@@ -403,7 +414,8 @@ class SessionMonitor extends EventEmitter {
       } else {
         // Process-only session (debug file is stale or missing)
         sessionMap.set(key, {
-          id: `pid-${proc.pid}`,
+          id: key,
+          debugId: null,
           cwd: proc.cwd,
           project: proc.project,
           mtime: null,
@@ -424,7 +436,8 @@ class SessionMonitor extends EventEmitter {
       if (!sessionMap.has(key)) {
         const label = ssh.user ? `${ssh.user}@${ssh.host}` : ssh.host;
         sessionMap.set(key, {
-          id: ssh.id,
+          id: key,
+          debugId: null,
           cwd: null,
           project: `remote:${label}`,
           mtime: null,
@@ -441,13 +454,15 @@ class SessionMonitor extends EventEmitter {
 
     const currentSessions = Array.from(sessionMap.values());
 
-    const currentIds = new Set(currentSessions.map(s => s.id));
+    // Set of cwd-based keys that are present this poll
+    const currentKeys = new Set(currentSessions.map(s => s.id));
 
     for (const sess of currentSessions) {
       if (!this.sessions.has(sess.id)) {
         // New session detected
         const session = {
           id: sess.id,
+          debugId: sess.debugId,
           pid: sess.pid,
           tty: sess.tty,
           cwd: sess.cwd,
@@ -463,6 +478,7 @@ class SessionMonitor extends EventEmitter {
           idlePolls: 0,
           busyPolls: 0, // consecutive busy polls — need several before transitions count
           busySince: sess.remote ? new Date() : null,
+          missingPolls: 0, // consecutive polls where this session wasn't found
         };
         this.sessions.set(sess.id, session);
 
@@ -474,6 +490,9 @@ class SessionMonitor extends EventEmitter {
       } else {
         // Existing session — update and track CPU delta
         const existing = this.sessions.get(sess.id);
+        // Reset missing counter — session is present this poll
+        existing.missingPolls = 0;
+        if (sess.debugId) existing.debugId = sess.debugId;
         if (sess.elapsedMs > 0) existing.elapsedMs = sess.elapsedMs;
         if (sess.cwd) existing.cwd = sess.cwd;
         if (sess.project) existing.project = sess.project;
@@ -553,20 +572,27 @@ class SessionMonitor extends EventEmitter {
       }
     }
 
-    // Detect ended sessions
+    // Detect ended sessions — require MISSING_CONFIRM_POLLS consecutive absent
+    // polls before declaring a session truly ended. This prevents flickering
+    // when debug files hover around the freshness threshold.
     for (const [id, session] of this.sessions) {
-      if (!currentIds.has(id)) {
-        this.sessions.delete(id);
-        const duration = session.elapsedMs > 0
-          ? this.formatDuration(session.elapsedMs)
-          : 'unknown';
-        log(`Session ended: ${session.project || id} (was running ${duration})`);
+      if (!currentKeys.has(id)) {
+        session.missingPolls = (session.missingPolls || 0) + 1;
 
-        this.emit('session-ended', {
-          ...session,
-          endedAt: new Date(),
-          duration,
-        });
+        if (session.missingPolls >= MISSING_CONFIRM_POLLS) {
+          this.sessions.delete(id);
+          const duration = session.elapsedMs > 0
+            ? this.formatDuration(session.elapsedMs)
+            : 'unknown';
+          log(`Session ended: ${session.project || id} (was running ${duration}, missing for ${session.missingPolls} polls)`);
+
+          this.emit('session-ended', {
+            ...session,
+            endedAt: new Date(),
+            duration,
+          });
+        }
+        // else: session is missing but hasn't been gone long enough — keep it
       }
     }
 

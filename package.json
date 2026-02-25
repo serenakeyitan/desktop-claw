@@ -59,7 +59,7 @@
       "logger.js",
       "social-backend.js",
       "alldaypoke",
-      "claude-code.png",
+      "icon.png",
       "package.json",
       "node_modules/**/*"
     ],
@@ -73,7 +73,7 @@
           ]
         }
       ],
-      "icon": "claude-code.png"
+      "icon": "icon.png"
     },
     "dmg": {
       "title": "All Day Poke",
@@ -92,11 +92,11 @@
     },
     "win": {
       "target": "nsis",
-      "icon": "claude-code.png"
+      "icon": "icon.png"
     },
     "linux": {
       "target": "AppImage",
-      "icon": "claude-code.png",
+      "icon": "icon.png",
       "category": "Utility"
     }
   }

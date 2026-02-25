@@ -34,7 +34,7 @@
 })();
 // ── End EPIPE protection ─────────────────────────────────────────────────
 
-const { app, BrowserWindow, ipcMain, Menu, shell, dialog, screen, Notification } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, shell, dialog, screen, Notification, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -1289,6 +1289,14 @@ const launchUrl = process.argv.find(arg => arg.startsWith('alldaypoke://'));
 
 // App event handlers
 app.whenReady().then(() => {
+  // Set dock icon to the robot (works in dev and packaged builds)
+  if (process.platform === 'darwin' && app.dock) {
+    const iconPath = path.join(__dirname, 'icon.png');
+    if (fs.existsSync(iconPath)) {
+      app.dock.setIcon(nativeImage.createFromPath(iconPath));
+    }
+  }
+
   // Handle deep link from launch args
   if (launchUrl) {
     // Defer until services are up
@@ -1300,6 +1308,14 @@ app.whenReady().then(() => {
     createSetupWindow();
   } else {
     createMainWindow();
+  }
+
+  // Auto-start on login for packaged builds
+  if (app.isPackaged) {
+    app.setLoginItemSettings({
+      openAtLogin: true,
+      openAsHidden: false,
+    });
   }
 
   // Check for updates (silent, non-blocking)

@@ -98,24 +98,34 @@ function runNpmCommand(command) {
 // Main execution
 const args = process.argv.slice(2);
 
-if (args.length === 0 || args[0] === 'help' || args[0] === '--help' || args[0] === '-h') {
+if (args[0] === 'help' || args[0] === '--help' || args[0] === '-h') {
   printHelp();
   process.exit(0);
 }
 
-const command = args[0];
-const commandArgs = args.slice(1);
-
-if (commands[command]) {
-  const target = commands[command];
-
-  if (target.startsWith('npm')) {
-    runNpmCommand(target);
-  } else {
-    runCommand(target, commandArgs);
-  }
+// No args → launch the app directly
+if (args.length === 0) {
+  const electron = require('electron');
+  const child = spawn(electron, [__dirname], {
+    stdio: 'inherit',
+    env: { ...process.env },
+  });
+  child.on('exit', (code) => process.exit(code || 0));
 } else {
-  print(`❌ Unknown command: ${command}`, colors.red);
-  print('Run "alldaypoke help" for available commands', colors.yellow);
-  process.exit(1);
+  const command = args[0];
+  const commandArgs = args.slice(1);
+
+  if (commands[command]) {
+    const target = commands[command];
+
+    if (target.startsWith('npm')) {
+      runNpmCommand(target);
+    } else {
+      runCommand(target, commandArgs);
+    }
+  } else {
+    print(`❌ Unknown command: ${command}`, colors.red);
+    print('Run "alldaypoke help" for available commands', colors.yellow);
+    process.exit(1);
+  }
 }
