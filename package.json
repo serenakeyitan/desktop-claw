@@ -6,9 +6,8 @@
   "scripts": {
     "start": "electron .",
     "dev": "ELECTRON_IS_DEV=1 electron .",
-    "test": "node test-openai-integration.js",
-    "setup": "node cli-setup.js",
-    "setup-token": "node cli-setup.js"
+    "dist": "electron-builder --mac",
+    "dist:all": "electron-builder --mac --win --linux"
   },
   "bin": {
     "alldaypoke": "./alldaypoke"
@@ -16,11 +15,89 @@
   "author": "All Day Poke",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^33.0.0"
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.78.0",
+    "electron-updater": "^6.8.3",
     "node-pty": "^1.1.0",
     "strip-ansi": "^7.1.2"
+  },
+  "build": {
+    "appId": "com.alldaypoke.desktop",
+    "productName": "All Day Poke",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "serenakeyitan",
+        "repo": "desktop-claw"
+      }
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "preload-social.js",
+      "preload-usage.js",
+      "renderer/**/*",
+      "watcher.js",
+      "proxy.js",
+      "usage-poller.js",
+      "auth-manager.js",
+      "auto-usage-updater.js",
+      "claude-status-tracker.js",
+      "claude-oauth-usage-tracker.js",
+      "claude-path.js",
+      "session-monitor.js",
+      "social-sync.js",
+      "supabase-client.js",
+      "usage-db.js",
+      "usage-tracker.js",
+      "logger.js",
+      "social-backend.js",
+      "alldaypoke",
+      "claude-code.png",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "icon": "claude-code.png"
+    },
+    "dmg": {
+      "title": "All Day Poke",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "claude-code.png"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "claude-code.png",
+      "category": "Utility"
+    }
   }
 }

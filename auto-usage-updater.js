@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const ClaudeOAuthUsageTracker = require('./claude-oauth-usage-tracker');
+const log = require('./logger');
 
 class AutoUsageUpdater {
   constructor() {
@@ -12,27 +13,27 @@ class AutoUsageUpdater {
 
   // Initialize with Claude OAuth usage tracking
   async init() {
-    console.log('Initializing Claude OAuth-based usage tracking...');
+    log('Initializing Claude OAuth-based usage tracking...');
 
     if (!this.claudeTracker) {
       this.claudeTracker = new ClaudeOAuthUsageTracker();
 
       // Listen for usage updates
       this.claudeTracker.on('usage-updated', (data) => {
-        console.log(`Claude OAuth tracker updated: ${data.percentage}% (5h) | Source: ${data.source}`);
+        log(`Claude OAuth tracker updated: ${data.percentage}% (5h) | Source: ${data.source}`);
         if (data.details?.seven_day) {
-          console.log(`  7-day usage: ${data.details.seven_day.utilization}%`);
+          log(`  7-day usage: ${data.details.seven_day.utilization}%`);
         }
       });
 
       this.claudeTracker.on('error', (err) => {
-        console.error('Claude OAuth tracker error:', err.message);
+        log.error('Claude OAuth tracker error:', err.message);
       });
 
       // Start tracking
       const success = await this.claudeTracker.start();
       if (!success) {
-        console.error('Failed to start Claude OAuth tracker');
+        log.error('Failed to start Claude OAuth tracker');
         return false;
       }
     }
@@ -58,7 +59,7 @@ class AutoUsageUpdater {
         }
       }
     } catch (e) {
-      console.log('Could not read usage file:', e.message);
+      log('Could not read usage file:', e.message);
     }
 
     return null;
@@ -66,7 +67,7 @@ class AutoUsageUpdater {
 
   // Start automatic updates
   async start(intervalMinutes = 2) {
-    console.log('Starting automatic Claude usage updater...');
+    log('Starting automatic Claude usage updater...');
 
     // Initialize the tracker
     await this.init();
@@ -82,11 +83,11 @@ class AutoUsageUpdater {
     try {
       const usage = await this.fetchUsage();
       if (usage !== null) {
-        console.log(`Claude usage: ${usage}%`);
+        log(`Claude usage: ${usage}%`);
         return true;
       }
     } catch (error) {
-      console.error('Auto-update failed:', error);
+      log.error('Auto-update failed:', error);
     }
     return false;
   }

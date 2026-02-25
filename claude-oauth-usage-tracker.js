@@ -6,12 +6,13 @@
  * real subscription usage data (5-hour, 7-day windows, etc.).
  */
 
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const EventEmitter = require('events');
+const log = require('./logger');
 
 // Claude Code OAuth config (production)
 const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
@@ -38,8 +39,9 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
   readKeychainCredentials() {
     try {
       const user = os.userInfo().username;
-      const raw = execSync(
-        `security find-generic-password -a "${user}" -w -s "${KEYCHAIN_SERVICE}"`,
+      const raw = execFileSync(
+        'security',
+        ['find-generic-password', '-a', user, '-w', '-s', KEYCHAIN_SERVICE],
         { encoding: 'utf8', timeout: 5000 }
       ).trim();
       const creds = JSON.parse(raw);
@@ -48,7 +50,7 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
       }
       return null;
     } catch (err) {
-      console.error('Failed to read Claude keychain credentials:', err.message);
+      log.error('Failed to read Claude keychain credentials:', err.message);
       return null;
     }
   }
@@ -126,11 +128,11 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
       throw new Error('No refresh token available');
     }
 
-    console.log('Refreshing Claude OAuth token...');
+    log('Refreshing Claude OAuth token...');
     const tokenData = await this.refreshToken(creds.refreshToken);
     this.cachedToken = tokenData.access_token;
     this.cachedTokenExpiresAt = Date.now() + (tokenData.expires_in * 1000);
-    console.log(`Token refreshed, valid for ${tokenData.expires_in}s`);
+    log(`Token refreshed, valid for ${tokenData.expires_in}s`);
 
     return this.cachedToken;
   }
@@ -263,7 +265,7 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
       }
       fs.writeFileSync(this.usageFile, JSON.stringify(normalizedData, null, 2));
     } catch (err) {
-      console.error('Failed to save usage data:', err.message);
+      log.error('Failed to save usage data:', err.message);
     }
   }
 
@@ -277,7 +279,7 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
       this.lastUsageData = normalized;
       this.saveUsage(normalized);
 
-      console.log(
+      log(
         `Claude usage updated: 5h=${normalized.details.five_hour?.utilization ?? 'N/A'}%` +
         ` | 7d=${normalized.details.seven_day?.utilization ?? 'N/A'}%` +
         ` | resets=${normalized.reset_at ?? 'unknown'}`
@@ -286,7 +288,7 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
       this.emit('usage-updated', normalized);
       return normalized;
     } catch (err) {
-      console.error('Failed to check Claude usage:', err.message);
+      log.error('Failed to check Claude usage:', err.message);
       this.emit('error', err);
       return null;
     }
@@ -296,16 +298,16 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
    * Start polling for usage data.
    */
   async start() {
-    console.log('Starting Claude OAuth usage tracker...');
+    log('Starting Claude OAuth usage tracker...');
 
     // Verify we can read credentials
     const creds = this.readKeychainCredentials();
     if (!creds) {
-      console.error('No Claude Code OAuth credentials found. Is Claude Code logged in?');
+      log.error('No Claude Code OAuth credentials found. Is Claude Code logged in?');
       return false;
     }
 
-    console.log(`Found Claude ${creds.subscriptionType || 'Pro'} subscription credentials`);
+    log(`Found Claude ${creds.subscriptionType || 'Pro'} subscription credentials`);
 
     // Do an initial check
     await this.checkUsage();
@@ -315,7 +317,7 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
       this.checkUsage();
     }, this.pollIntervalMs);
 
-    console.log(`Polling usage every ${this.pollIntervalMs / 1000}s`);
+    log(`Polling usage every ${this.pollIntervalMs / 1000}s`);
     return true;
   }
 

@@ -105,9 +105,9 @@ The robot has two automatic states:
 
 ## 📊 Token Bar Colors
 
-- 🟢 **Green** (>60%): Plenty of tokens remaining
-- 🟡 **Yellow** (30-60%): Moderate usage
-- 🔴 **Red** (<30%): Low tokens, be careful!
+- 🟢 **Green** (<40% used): Plenty of tokens remaining
+- 🟡 **Yellow** (40-70% used): Moderate usage
+- 🔴 **Red** (>70% used): Running low, be careful!
 
 ## 🐛 Troubleshooting
 

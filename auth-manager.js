@@ -2,6 +2,7 @@ const https = require('https');
 const crypto = require('crypto');
 const { shell, BrowserWindow, dialog } = require('electron');
 const EventEmitter = require('events');
+const log = require('./logger');
 
 class AuthManager extends EventEmitter {
   constructor() {
@@ -216,7 +217,7 @@ class AuthManager extends EventEmitter {
       });
 
       server.listen(8989, 'localhost', () => {
-        console.log('OAuth callback server listening on http://localhost:8989/callback');
+        log('OAuth callback server listening on http://localhost:8989/callback');
       });
 
       // Handle waiting dialog close (user cancelled)
@@ -331,7 +332,7 @@ class AuthManager extends EventEmitter {
     if (this.authMethod === 'oauth' && this.accessToken) {
       // Check if token needs refresh
       if (this.isTokenExpired()) {
-        this.refreshAccessToken().catch(console.error);
+        this.refreshAccessToken().catch(log.error);
       }
       return {
         'Authorization': `Bearer ${this.accessToken}`,
@@ -391,7 +392,7 @@ class AuthManager extends EventEmitter {
         const decrypted = Buffer.from(encrypted, 'base64').toString('utf8');
         return JSON.parse(decrypted);
       } catch (error) {
-        console.error('Failed to load stored tokens:', error);
+        log.error('Failed to load stored tokens:', error);
       }
     }
 

@@ -10,10 +10,15 @@ const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const log = require('./logger');
 
 const CONFIG_DIR = path.join(os.homedir(), '.alldaypoke');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 const SESSION_FILE = path.join(CONFIG_DIR, 'supabase-session.json');
+
+// Bundled Supabase credentials (anon key is public-safe; RLS protects data)
+const BUNDLED_SUPABASE_URL = 'https://eukdqgkfqiwqfrnjvfdg.supabase.co';
+const BUNDLED_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV1a2RxZ2tmcWl3cWZybmp2ZmRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4Mjc1MjAsImV4cCI6MjA4NzQwMzUyMH0.693TeAuKRYPW4NMIY5Bk-XJXtJofQgO3k_ikmPJVFOU';
 
 let supabase = null;
 
@@ -33,7 +38,7 @@ function saveConfig(config) {
     if (!fs.existsSync(CONFIG_DIR)) fs.mkdirSync(CONFIG_DIR, { recursive: true });
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
   } catch (err) {
-    console.error('supabase-client: failed to save config', err.message);
+    log.error('supabase-client: failed to save config', err.message);
   }
 }
 
@@ -42,7 +47,7 @@ function saveSession(session) {
     if (!fs.existsSync(CONFIG_DIR)) fs.mkdirSync(CONFIG_DIR, { recursive: true });
     fs.writeFileSync(SESSION_FILE, JSON.stringify(session, null, 2));
   } catch (err) {
-    console.error('supabase-client: failed to save session', err.message);
+    log.error('supabase-client: failed to save session', err.message);
   }
 }
 
@@ -71,11 +76,11 @@ function getSupabase() {
   if (supabase) return supabase;
 
   const config = loadConfig();
-  const url = config.supabaseUrl || process.env.SUPABASE_URL;
-  const key = config.supabaseAnonKey || process.env.SUPABASE_ANON_KEY;
+  const url = config.supabaseUrl || process.env.SUPABASE_URL || BUNDLED_SUPABASE_URL;
+  const key = config.supabaseAnonKey || process.env.SUPABASE_ANON_KEY || BUNDLED_SUPABASE_ANON_KEY;
 
   if (!url || !key) {
-    console.warn('supabase-client: missing SUPABASE_URL or SUPABASE_ANON_KEY');
+    log.warn('supabase-client: missing Supabase credentials');
     return null;
   }
 
@@ -108,7 +113,7 @@ async function restoreSession() {
   });
 
   if (error || !data.session) {
-    console.warn('supabase-client: session restore failed', error?.message);
+    log.warn('supabase-client: session restore failed', error?.message);
     clearSession();
     return null;
   }
@@ -158,7 +163,7 @@ async function signUp(email, password, username, twitterUsername, githubUsername
   const { error: profileErr } = await sb.from('profiles').insert(profileRow);
 
   if (profileErr) {
-    console.error('supabase-client: profile insert failed', profileErr.message);
+    log.error('supabase-client: profile insert failed', profileErr.message);
     // Not fatal — the user can update their profile later
   }
 
@@ -229,7 +234,7 @@ async function getMyProfile() {
     .single();
 
   if (error) {
-    console.error('supabase-client: getMyProfile failed', error.message);
+    log.error('supabase-client: getMyProfile failed', error.message);
     return null;
   }
   return data;

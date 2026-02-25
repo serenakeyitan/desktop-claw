@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const EventEmitter = require('events');
+const log = require('./logger');
 
 class ClaudeStatusTracker extends EventEmitter {
   constructor() {
@@ -19,7 +20,7 @@ class ClaudeStatusTracker extends EventEmitter {
 
   // Start tracking
   async start() {
-    console.log('Starting Claude Code /status automatic tracking...');
+    log('Starting Claude Code /status automatic tracking...');
 
     // Load previous session if exists
     this.loadSession();
@@ -30,7 +31,7 @@ class ClaudeStatusTracker extends EventEmitter {
     // Initial status check
     await this.checkStatus();
 
-    console.log('Claude /status tracking initialized');
+    log('Claude /status tracking initialized');
   }
 
   // Load previous session data
@@ -39,10 +40,10 @@ class ClaudeStatusTracker extends EventEmitter {
       if (fs.existsSync(this.sessionFile)) {
         const session = JSON.parse(fs.readFileSync(this.sessionFile, 'utf8'));
         this.lastStatusData = session.lastStatus || null;
-        console.log('Loaded previous status session');
+        log('Loaded previous status session');
       }
     } catch (error) {
-      console.log('No previous session found');
+      log('No previous session found');
     }
   }
 
@@ -72,12 +73,12 @@ class ClaudeStatusTracker extends EventEmitter {
   // Run /status command and parse output
   async checkStatus() {
     if (this.isChecking) {
-      console.log('Status check already in progress, skipping...');
+      log('Status check already in progress, skipping...');
       return;
     }
 
     this.isChecking = true;
-    console.log('Checking Claude /status...');
+    log('Checking Claude /status...');
 
     return new Promise((resolve) => {
       const statusProcess = spawn(this.claudeBinary, ['/status'], {
@@ -99,7 +100,7 @@ class ClaudeStatusTracker extends EventEmitter {
 
       // Set timeout to kill process if it hangs
       processTimeout = setTimeout(() => {
-        console.log('Status check timed out after 60 seconds, killing process...');
+        log('Status check timed out after 60 seconds, killing process...');
         statusProcess.kill();
       }, 60000);  // Increased from 5s to 60s
 
@@ -108,14 +109,14 @@ class ClaudeStatusTracker extends EventEmitter {
         this.isChecking = false;
 
         if (stdout) {
-          console.log('Got status output:', stdout);
+          log('Got status output:', stdout);
           this.parseStatusOutput(stdout);
         } else if (stderr) {
-          console.log('Status error output:', stderr);
+          log('Status error output:', stderr);
           // Try to parse error output in case it contains usage info
           this.parseStatusOutput(stderr);
         } else {
-          console.log('No output from /status command');
+          log('No output from /status command');
         }
 
         resolve();
@@ -124,7 +125,7 @@ class ClaudeStatusTracker extends EventEmitter {
       statusProcess.on('error', (error) => {
         clearTimeout(processTimeout);
         this.isChecking = false;
-        console.error('Failed to run /status:', error.message);
+        log.error('Failed to run /status:', error.message);
         resolve();
       });
     });
@@ -136,7 +137,7 @@ class ClaudeStatusTracker extends EventEmitter {
       // Remove ANSI escape sequences
       const cleanOutput = output.replace(/\x1b\[[0-9;]*m/g, '');
 
-      console.log('Parsing status output...');
+      log('Parsing status output...');
 
       // Look for various patterns that might contain usage info
       const patterns = [
@@ -172,7 +173,7 @@ class ClaudeStatusTracker extends EventEmitter {
       for (const pattern of patterns) {
         const match = cleanOutput.match(pattern);
         if (match) {
-          console.log(`Matched pattern: ${pattern}, Result: ${match[0]}`);
+          log(`Matched pattern: ${pattern}, Result: ${match[0]}`);
 
           // Extract percentage
           if (pattern.toString().includes('%') && match[1]) {
@@ -205,7 +206,7 @@ class ClaudeStatusTracker extends EventEmitter {
       if (jsonMatch) {
         try {
           const jsonData = JSON.parse(jsonMatch[0]);
-          console.log('Found JSON data:', jsonData);
+          log('Found JSON data:', jsonData);
 
           if (jsonData.usage !== undefined) {
             usagePercentage = jsonData.usage;
@@ -226,7 +227,7 @@ class ClaudeStatusTracker extends EventEmitter {
 
       // If we found usage data, save it
       if (usagePercentage !== null) {
-        console.log(`Extracted usage: ${usagePercentage}%`);
+        log(`Extracted usage: ${usagePercentage}%`);
         this.saveUsage(usagePercentage, {
           messagesUsed,
           messageLimit,
@@ -234,12 +235,12 @@ class ClaudeStatusTracker extends EventEmitter {
           resetInfo
         });
       } else {
-        console.log('Could not extract usage percentage from status output');
+        log('Could not extract usage percentage from status output');
 
         // Save raw output for debugging
         const debugFile = path.join(os.homedir(), '.alldaypoke', 'last-status-output.txt');
         fs.writeFileSync(debugFile, output);
-        console.log(`Saved raw output to ${debugFile} for debugging`);
+        log(`Saved raw output to ${debugFile} for debugging`);
       }
 
       this.lastStatusData = {
@@ -249,7 +250,7 @@ class ClaudeStatusTracker extends EventEmitter {
       this.saveSession();
 
     } catch (error) {
-      console.error('Error parsing status output:', error);
+      log.error('Error parsing status output:', error);
     }
   }
 
@@ -279,7 +280,7 @@ class ClaudeStatusTracker extends EventEmitter {
 
     fs.writeFileSync(this.usageFile, JSON.stringify(usageData, null, 2));
 
-    console.log(`Saved usage: ${percentage}%`);
+    log(`Saved usage: ${percentage}%`);
     this.emit('usage-updated', usageData);
   }
 
@@ -290,7 +291,7 @@ class ClaudeStatusTracker extends EventEmitter {
         return JSON.parse(fs.readFileSync(this.usageFile, 'utf8'));
       }
     } catch (error) {
-      console.error('Error reading usage file:', error);
+      log.error('Error reading usage file:', error);
     }
 
     return {
@@ -307,7 +308,7 @@ class ClaudeStatusTracker extends EventEmitter {
       clearInterval(this.checkInterval);
     }
     this.saveSession();
-    console.log('Claude /status tracking stopped');
+    log('Claude /status tracking stopped');
   }
 }
 
@@ -320,7 +321,7 @@ if (require.main === module) {
 
   // Handle shutdown gracefully
   process.on('SIGINT', () => {
-    console.log('\nShutting down tracker...');
+    log('\nShutting down tracker...');
     tracker.stop();
     process.exit(0);
   });
@@ -330,8 +331,8 @@ if (require.main === module) {
 
   // Log usage updates
   tracker.on('usage-updated', (data) => {
-    console.log(`Usage updated: ${data.percentage}% | Source: ${data.source}`);
+    log(`Usage updated: ${data.percentage}% | Source: ${data.source}`);
   });
 
-  console.log('Claude /status Tracker running... Press Ctrl+C to stop');
+  log('Claude /status Tracker running... Press Ctrl+C to stop');
 }

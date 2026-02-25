@@ -2,6 +2,7 @@ const EventEmitter = require('events');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const log = require('./logger');
 
 // Local usage tracking for Claude subscriptions
 class UsageTracker extends EventEmitter {
@@ -25,7 +26,7 @@ class UsageTracker extends EventEmitter {
         };
       }
     } catch (error) {
-      console.error('Error loading usage data:', error);
+      log.error('Error loading usage data:', error);
     }
 
     return {
@@ -45,7 +46,7 @@ class UsageTracker extends EventEmitter {
       }
       fs.writeFileSync(this.dataFile, JSON.stringify(this.usage, null, 2));
     } catch (error) {
-      console.error('Error saving usage data:', error);
+      log.error('Error saving usage data:', error);
     }
   }
 
@@ -59,7 +60,7 @@ class UsageTracker extends EventEmitter {
         now.getMonth() !== lastReset.getMonth() ||
         now.getFullYear() !== lastReset.getFullYear()) {
 
-      console.log('Resetting daily usage counter');
+      log('Resetting daily usage counter');
       this.usage.messagesUsed = 0;
       this.usage.lastReset = now;
       this.usage.dailyMessages = [];
@@ -136,7 +137,7 @@ class UsageTracker extends EventEmitter {
   // Update with real usage data from ClaudeUsageFetcher
   setRealUsage(realUsageData) {
     if (realUsageData && realUsageData.used !== undefined) {
-      console.log('Updating with real usage data:', realUsageData);
+      log('Updating with real usage data:', realUsageData);
       this.usage.messagesUsed = realUsageData.used;
       this.usage.subscription = realUsageData.subscription || this.usage.subscription;
 

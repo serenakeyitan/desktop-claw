@@ -12,6 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const log = require('./logger');
 
 const DB_FILE = path.join(os.homedir(), '.alldaypoke', 'usage-history.json');
 const COMPACT_AFTER_DAYS = 30;
@@ -31,7 +32,7 @@ class UsageDB {
         if (raw.version === 1) return raw;
       }
     } catch (err) {
-      console.error('UsageDB: failed to load, starting fresh:', err.message);
+      log.error('UsageDB: failed to load, starting fresh:', err.message);
     }
     return { version: 1, entries: [], dailySummaries: {} };
   }
@@ -45,7 +46,7 @@ class UsageDB {
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(DB_FILE, JSON.stringify(this.data, null, 2));
     } catch (err) {
-      console.error('UsageDB: failed to save:', err.message);
+      log.error('UsageDB: failed to save:', err.message);
     }
   }
 
@@ -222,7 +223,7 @@ class UsageDB {
     }
 
     this.data.entries = toKeep;
-    console.log(`UsageDB: compacted ${toCompact.length} old entries into daily summaries`);
+    log(`UsageDB: compacted ${toCompact.length} old entries into daily summaries`);
     this.save();
   }
 

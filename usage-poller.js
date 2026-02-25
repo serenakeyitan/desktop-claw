@@ -1,5 +1,6 @@
 const https = require('https');
 const EventEmitter = require('events');
+const log = require('./logger');
 
 class UsagePoller extends EventEmitter {
   constructor(authManager, pollIntervalSeconds = 30) {
@@ -237,7 +238,7 @@ class UsagePoller extends EventEmitter {
   }
 
   handleError(error) {
-    console.error('Usage polling error:', error.message);
+    log.error('Usage polling error:', error.message);
 
     // Apply exponential backoff for rate limits
     if (error.message.includes('Rate limited')) {

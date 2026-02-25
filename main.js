@@ -1,6 +1,6 @@
 // ── EPIPE protection ─────────────────────────────────────────────────────
 // Must be the VERY FIRST thing that runs, before any require() that might
-// call console.log at import time.
+// call log at import time.
 //
 // Electron pipes stdout/stderr to the parent process (or nowhere when
 // launched from Finder). When that pipe breaks, Socket._write throws EPIPE
@@ -48,6 +48,39 @@ const SessionMonitor = require('./session-monitor');
 const UsageDB = require('./usage-db');
 const supabaseClient = require('./supabase-client');
 const SocialSync = require('./social-sync');
+const log = require('./logger');
+
+// ── Auto-updater (graceful — works when code-signed, silent otherwise) ──
+function initAutoUpdater() {
+  try {
+    const { autoUpdater } = require('electron-updater');
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+
+    autoUpdater.on('update-available', (info) => {
+      log('Update available:', info.version);
+    });
+    autoUpdater.on('update-downloaded', (info) => {
+      log('Update downloaded:', info.version, '— will install on quit');
+      // Optionally notify the user via Notification
+      if (Notification.isSupported()) {
+        new Notification({
+          title: 'All Day Poke Update',
+          body: `v${info.version} downloaded. Restart to update.`,
+        }).show();
+      }
+    });
+    autoUpdater.on('error', (err) => {
+      // Silent fail — expected when app is unsigned or running from source
+      log('Auto-updater not available:', err.message);
+    });
+
+    autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+  } catch (err) {
+    // electron-updater not available (e.g., running from source with npx electron .)
+    log('Auto-updater skipped:', err.message);
+  }
+}
 
 // Configuration
 const CONFIG_DIR = path.join(os.homedir(), '.alldaypoke');
@@ -99,7 +132,7 @@ function loadConfig() {
     const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
     return { ...DEFAULT_CONFIG, ...config };
   } catch (error) {
-    console.error('Error loading config:', error);
+    log.error('Error loading config:', error);
     return DEFAULT_CONFIG;
   }
 }
@@ -109,7 +142,7 @@ function saveConfig(config) {
   try {
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
   } catch (error) {
-    console.error('Error saving config:', error);
+    log.error('Error saving config:', error);
   }
 }
 
@@ -122,11 +155,12 @@ function hasAuth() {
   }
   // Check if Claude Code credentials exist in keychain (auto-detect)
   try {
-    const { execSync } = require('child_process');
+    const { execFileSync } = require('child_process');
     const user = require('os').userInfo().username;
-    execSync(
-      `security find-generic-password -a "${user}" -s "Claude Code-credentials" > /dev/null 2>&1`,
-      { timeout: 3000 }
+    execFileSync(
+      'security',
+      ['find-generic-password', '-a', user, '-s', 'Claude Code-credentials'],
+      { timeout: 3000, stdio: 'ignore' }
     );
     // Claude Code is logged in - use it automatically
     config.authType = 'claude-oauth';
@@ -290,13 +324,13 @@ function checkManualUsageFile() {
       if (age < 6 * 60 * 60 * 1000) {
         const normalized = normalizeUsageData(data, data.source || 'manual-file');
         if (normalized) {
-          console.log('Found recent manual usage data:', normalized);
+          log('Found recent manual usage data:', normalized);
           return normalized;
         }
       }
     }
   } catch (error) {
-    console.log('Could not read manual usage file:', error);
+    log('Could not read manual usage file:', error);
   }
   return null;
 }
@@ -308,7 +342,7 @@ async function initializeServices() {
   // Initialize usage history database
   if (!usageDB) {
     usageDB = new UsageDB();
-    console.log('Usage history database loaded');
+    log('Usage history database loaded');
   }
 
   // Start the AutoUsageUpdater for Claude /status tracking
@@ -317,7 +351,7 @@ async function initializeServices() {
 
     try {
       await autoUsageUpdater.init();
-      console.log('Started automatic Claude /status usage tracking');
+      log('Started automatic Claude /status usage tracking');
 
       // Start automatic updates
       autoUsageUpdater.start(1); // Check every minute
@@ -352,11 +386,11 @@ async function initializeServices() {
                   // Estimate active time as the full poll interval (60s)
                   usageDB.recordUsage(project, perSession, 60000);
                 }
-                console.log(`Usage attributed: +${delta.toFixed(1)}% to ${busySessions.map(s => s.project).join(', ')}`);
+                log(`Usage attributed: +${delta.toFixed(1)}% to ${busySessions.map(s => s.project).join(', ')}`);
               } else {
                 // No busy sessions — attribute to "other" (web usage, etc.)
                 usageDB.recordUsage('(other)', delta, 0);
-                console.log(`Usage attributed: +${delta.toFixed(1)}% to (other) — no active sessions`);
+                log(`Usage attributed: +${delta.toFixed(1)}% to (other) — no active sessions`);
               }
             }
           }
@@ -364,14 +398,14 @@ async function initializeServices() {
         }
       });
     } catch (error) {
-      console.error('Failed to start auto usage updater:', error);
+      log.error('Failed to start auto usage updater:', error);
     }
   }
 
   // Check for manual usage data
   const manualUsage = checkManualUsageFile();
   if (manualUsage && mainWindow) {
-    console.log('Using manual usage data from file');
+    log('Using manual usage data from file');
     mainWindow.webContents.send('token-update', manualUsage);
 
     // Set up periodic check for manual updates
@@ -425,13 +459,13 @@ async function initializeServices() {
       // Track message if using Claude subscription
       if (usageTracker) {
         usageTracker.trackMessage('api_call');
-        console.log('Tracked API call - real usage updated');
+        log('Tracked API call - real usage updated');
       }
     });
     proxyServer.start();
-    console.log(`Proxy server started on port ${config.proxy_port}`);
+    log(`Proxy server started on port ${config.proxy_port}`);
   } catch (error) {
-    console.error('Failed to start proxy server:', error);
+    log.error('Failed to start proxy server:', error);
   }
 
   // Start log watcher (Method B)
@@ -441,9 +475,9 @@ async function initializeServices() {
       setActivityState('active');
     });
     logWatcher.start();
-    console.log('Log watcher started');
+    log('Log watcher started');
   } catch (error) {
-    console.error('Failed to start log watcher:', error);
+    log.error('Failed to start log watcher:', error);
   }
 
   // Start session monitor to detect active Claude Code sessions
@@ -486,20 +520,20 @@ async function initializeServices() {
     });
 
     sessionMonitor.start();
-    console.log('Session monitor started');
+    log('Session monitor started');
   } catch (error) {
-    console.error('Failed to start session monitor:', error);
+    log.error('Failed to start session monitor:', error);
   }
 
   // Try to restore a previous Supabase social session
   try {
     const restoredUser = await supabaseClient.restoreSession();
     if (restoredUser) {
-      console.log('Supabase session restored for', restoredUser.email);
+      log('Supabase session restored for', restoredUser.email);
       await startSocialSync();
     }
   } catch (error) {
-    console.log('No Supabase session to restore:', error.message);
+    log('No Supabase session to restore:', error.message);
   }
 }
 
@@ -561,6 +595,7 @@ ipcMain.handle('get-config', () => {
 });
 
 ipcMain.handle('save-config', (event, newConfig) => {
+  if (!newConfig || typeof newConfig !== 'object') return false;
   saveConfig(newConfig);
   return true;
 });
@@ -573,12 +608,56 @@ ipcMain.handle('quit-app', () => {
   app.quit();
 });
 
+// Save manual usage from the Update Usage popup (secure IPC replacement)
+ipcMain.handle('save-manual-usage', (event, percentage) => {
+  // Validate input
+  const pct = parseInt(percentage);
+  if (isNaN(pct) || pct < 0 || pct > 100) {
+    return { error: 'Invalid percentage' };
+  }
+
+  const usageFile = path.join(os.homedir(), '.alldaypoke', 'real-usage.json');
+  const dir = path.dirname(usageFile);
+
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  const now = new Date();
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const usageData = {
+    percentage: pct,
+    used: pct,
+    limit: 100,
+    resetAt: endOfMonth.toISOString(),
+    subscription: 'Claude',
+    type: 'monthly',
+    realData: true,
+    timestamp: now.toISOString(),
+    source: 'manual-menu'
+  };
+
+  fs.writeFileSync(usageFile, JSON.stringify(usageData, null, 2));
+  return { success: true };
+});
+
+// Close the usage popup window
+ipcMain.handle('close-usage-window', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win && !win.isDestroyed()) {
+    win.close();
+  }
+});
+
 // Setup flow: check if Claude Code CLI is installed
 ipcMain.handle('check-claude-installed', () => {
   try {
-    const { execSync } = require('child_process');
-    const claudePath = execSync('which claude', { encoding: 'utf8', timeout: 3000 }).trim();
-    const version = execSync('claude --version 2>/dev/null || echo unknown', { encoding: 'utf8', timeout: 5000 }).trim();
+    const { execFileSync } = require('child_process');
+    const claudePath = execFileSync('which', ['claude'], { encoding: 'utf8', timeout: 3000 }).trim();
+    let version = 'unknown';
+    try {
+      version = execFileSync('claude', ['--version'], { encoding: 'utf8', timeout: 5000 }).trim();
+    } catch { /* version check may fail */ }
     return { installed: true, path: claudePath, version };
   } catch {
     return { installed: false, path: null, version: null };
@@ -588,10 +667,11 @@ ipcMain.handle('check-claude-installed', () => {
 // Setup flow: check if Claude Code has credentials in keychain
 ipcMain.handle('check-claude-credentials', () => {
   try {
-    const { execSync } = require('child_process');
+    const { execFileSync } = require('child_process');
     const user = os.userInfo().username;
-    const raw = execSync(
-      `security find-generic-password -a "${user}" -w -s "Claude Code-credentials"`,
+    const raw = execFileSync(
+      'security',
+      ['find-generic-password', '-a', user, '-w', '-s', 'Claude Code-credentials'],
       { encoding: 'utf8', timeout: 5000 }
     ).trim();
     const creds = JSON.parse(raw);
@@ -633,6 +713,7 @@ ipcMain.handle('test-claude-connection', async () => {
 
 // Setup flow: save auth type and launch main window
 ipcMain.handle('complete-setup', async (event, authType) => {
+  if (typeof authType !== 'string') return { error: 'Invalid auth type' };
   const config = loadConfig();
   config.authType = authType;
   saveConfig(config);
@@ -687,9 +768,11 @@ function openRankingWindow() {
 
 // IPC: fetch ranking data for the ranking window
 ipcMain.handle('get-ranking', (event, period) => {
+  const validPeriods = ['today', '7d', '30d', 'all'];
+  const safePeriod = validPeriods.includes(period) ? period : 'all';
   if (!usageDB) usageDB = new UsageDB();
-  const ranking = usageDB.getRanking(period || 'all');
-  const total = usageDB.getTotalUsage(period || 'all');
+  const ranking = usageDB.getRanking(safePeriod);
+  const total = usageDB.getTotalUsage(safePeriod);
   return { ranking, total };
 });
 
@@ -758,7 +841,7 @@ async function startSocialSync() {
   socialSync = new SocialSync(usageDB);
   await socialSync.start();
   startPokePolling();
-  console.log('Social sync started');
+  log('Social sync started');
 
   // If session monitor is active, feed vibing status
   // Any open Claude Code session = vibing (LIVE), not just busy ones
@@ -779,8 +862,13 @@ async function startSocialSync() {
 // ── Social IPC handlers ─────────────────────────────────────────────────
 
 ipcMain.handle('social-sign-up', async (event, email, password, username, twitter, github) => {
+  if (typeof email !== 'string' || typeof password !== 'string' || typeof username !== 'string') {
+    return { error: 'Invalid input' };
+  }
   try {
-    const result = await supabaseClient.signUp(email, password, username, twitter, github);
+    const result = await supabaseClient.signUp(email, password, username,
+      typeof twitter === 'string' ? twitter : undefined,
+      typeof github === 'string' ? github : undefined);
     // Start sync after signup
     await startSocialSync();
     // Process pending invite code from deep link (auto-add friend)
@@ -801,6 +889,7 @@ ipcMain.handle('social-sign-up', async (event, email, password, username, twitte
 });
 
 ipcMain.handle('social-sign-in', async (event, email, password) => {
+  if (typeof email !== 'string') return { error: 'Invalid input' };
   // Special '__continue__' signal from the success panel
   if (email === '__continue__') {
     if (loginWindow && !loginWindow.isDestroyed()) loginWindow.close();
@@ -843,6 +932,7 @@ ipcMain.handle('social-sign-out', async () => {
 });
 
 ipcMain.handle('social-send-reset', async (event, email) => {
+  if (typeof email !== 'string') return { error: 'Invalid input' };
   try {
     await supabaseClient.sendPasswordReset(email);
     return { success: true };
@@ -852,6 +942,9 @@ ipcMain.handle('social-send-reset', async (event, email) => {
 });
 
 ipcMain.handle('social-reset-password', async (event, email, otpCode, newPassword) => {
+  if (typeof email !== 'string' || typeof otpCode !== 'string' || typeof newPassword !== 'string') {
+    return { error: 'Invalid input' };
+  }
   try {
     await supabaseClient.resetPassword(email, otpCode, newPassword);
     return { success: true };
@@ -870,6 +963,7 @@ ipcMain.handle('social-get-profile', async () => {
 });
 
 ipcMain.handle('social-update-profile', async (event, updates) => {
+  if (!updates || typeof updates !== 'object') return { error: 'Invalid input' };
   try {
     const profile = await supabaseClient.updateProfile(updates);
     return { success: true, profile };
@@ -888,6 +982,7 @@ ipcMain.handle('open-external-url', async (event, url) => {
 
 ipcMain.handle('social-add-friend', async (event, code) => {
   if (!socialSync) return { success: false, error: 'Not logged in' };
+  if (typeof code !== 'string' || code.length > 20) return { success: false, error: 'Invalid code' };
   return await socialSync.addFriend(code);
 });
 
@@ -898,17 +993,20 @@ ipcMain.handle('social-get-friends', async () => {
 
 ipcMain.handle('social-remove-friend', async (event, friendId) => {
   if (!socialSync) return;
+  if (typeof friendId !== 'string') return;
   return await socialSync.removeFriend(friendId);
 });
 
 ipcMain.handle('social-friend-ranking', async (event, period) => {
   if (!socialSync) return [];
-  return await socialSync.getFriendRanking(period || 'all');
+  const validPeriods = ['today', '7d', '30d', 'all'];
+  return await socialSync.getFriendRanking(validPeriods.includes(period) ? period : 'all');
 });
 
 ipcMain.handle('social-global-ranking', async (event, period) => {
   if (!socialSync) return [];
-  return await socialSync.getGlobalRanking(period || 'all');
+  const validPeriods = ['today', '7d', '30d', 'all'];
+  return await socialSync.getGlobalRanking(validPeriods.includes(period) ? period : 'all');
 });
 
 // Return locally-detected subscription tier + active session info for social fallback
@@ -940,6 +1038,7 @@ ipcMain.handle('social-get-local-info', () => {
 
 ipcMain.handle('social-send-poke', async (event, recipientId) => {
   if (!socialSync) return { success: false, error: 'Not logged in' };
+  if (typeof recipientId !== 'string') return { success: false, error: 'Invalid recipient' };
   try {
     return await socialSync.sendPoke(recipientId);
   } catch (err) {
@@ -1040,7 +1139,7 @@ ipcMain.handle('show-context-menu', (event) => {
     {
       label: '📊 Update Usage',
       click: () => {
-        // Create a simple input window for usage update
+        // Create a secure input window for usage update (no nodeIntegration)
         const inputWindow = new BrowserWindow({
           width: 400,
           height: 200,
@@ -1048,103 +1147,17 @@ ipcMain.handle('show-context-menu', (event) => {
           minimizable: false,
           maximizable: false,
           webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, 'preload-usage.js')
           },
           title: 'Update Usage'
         });
 
-        inputWindow.loadURL(`data:text/html,
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <style>
-              body {
-                font-family: system-ui, -apple-system, sans-serif;
-                padding: 20px;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-              }
-              h3 { margin-top: 0; }
-              input {
-                width: 100%;
-                padding: 8px;
-                font-size: 16px;
-                border: none;
-                border-radius: 4px;
-                margin: 10px 0;
-              }
-              button {
-                background: white;
-                color: #667eea;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 4px;
-                font-size: 14px;
-                cursor: pointer;
-                margin-right: 10px;
-              }
-              button:hover {
-                opacity: 0.9;
-              }
-              .info {
-                font-size: 12px;
-                opacity: 0.9;
-                margin-bottom: 15px;
-              }
-            </style>
-          </head>
-          <body>
-            <h3>Update Usage</h3>
-            <div class="info">Enter your current usage percentage</div>
-            <input type="number" id="usage" placeholder="Enter percentage (0-100)" min="0" max="100" autofocus>
-            <div style="margin-top: 20px;">
-              <button onclick="save()">Save</button>
-              <button onclick="window.close()">Cancel</button>
-            </div>
-            <script>
-              const {ipcRenderer} = require('electron');
-              function save() {
-                const value = document.getElementById('usage').value;
-                const percentage = parseInt(value);
-                if (!isNaN(percentage) && percentage >= 0 && percentage <= 100) {
-                  const fs = require('fs');
-                  const path = require('path');
-                  const os = require('os');
-                  const usageFile = path.join(os.homedir(), '.alldaypoke', 'real-usage.json');
-                  const dir = path.dirname(usageFile);
+        // Track this window for the close-usage-window IPC
+        inputWindow.webContents._usageWindow = true;
 
-                  if (!fs.existsSync(dir)) {
-                    fs.mkdirSync(dir, { recursive: true });
-                  }
-
-                  const now = new Date();
-                  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-                  const usageData = {
-                    percentage: percentage,
-                    used: percentage,
-                    limit: 100,
-                    resetAt: endOfMonth.toISOString(),
-                    subscription: 'Claude',
-                    type: 'monthly',
-                    realData: true,
-                    timestamp: new Date().toISOString(),
-                    source: 'manual-menu'
-                  };
-
-                  fs.writeFileSync(usageFile, JSON.stringify(usageData, null, 2));
-                  window.close();
-                } else {
-                  alert('Please enter a valid percentage between 0 and 100');
-                }
-              }
-              document.getElementById('usage').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') save();
-              });
-            </script>
-          </body>
-          </html>
-        `);
+        inputWindow.loadFile(path.join(__dirname, 'renderer', 'update-usage.html'));
 
         inputWindow.on('close', () => {
           // Reload main window to show new usage
@@ -1203,14 +1216,14 @@ if (process.defaultApp) {
  * - If not logged in → store pendingInviteCode, open login; friend added after login
  */
 async function handleDeepLink(url) {
-  console.log('Deep link received:', url);
+  log('Deep link received:', url);
 
   // ── Invite: alldaypoke://invite/ABCD1234
   const match = url.match(/alldaypoke:\/\/invite\/([A-Za-z0-9]+)/);
   if (!match) return;
 
   const code = match[1].toUpperCase();
-  console.log('Invite code from deep link:', code);
+  log('Invite code from deep link:', code);
 
   const user = await supabaseClient.getCurrentUser();
   if (user && socialSync) {
@@ -1218,7 +1231,7 @@ async function handleDeepLink(url) {
     try {
       const result = await socialSync.addFriend(code);
       if (result?.success) {
-        console.log('Friend added via deep link:', result.friend?.username);
+        log('Friend added via deep link:', result.friend?.username);
         if (Notification.isSupported()) {
           new Notification({
             title: 'Friend added!',
@@ -1229,7 +1242,7 @@ async function handleDeepLink(url) {
         // Open social window to show the result
         openSocialWindow();
       } else {
-        console.log('Deep link add friend failed:', result?.error);
+        log('Deep link add friend failed:', result?.error);
         if (Notification.isSupported()) {
           new Notification({
             title: 'Could not add friend',
@@ -1239,7 +1252,7 @@ async function handleDeepLink(url) {
         }
       }
     } catch (err) {
-      console.error('Deep link addFriend error:', err.message);
+      log.error('Deep link addFriend error:', err.message);
     }
   } else {
     // Not logged in — queue the code and open login
@@ -1288,6 +1301,9 @@ app.whenReady().then(() => {
   } else {
     createMainWindow();
   }
+
+  // Check for updates (silent, non-blocking)
+  initAutoUpdater();
 });
 
 app.on('window-all-closed', () => {
@@ -1318,17 +1334,20 @@ ipcMain.handle('set-ignore-mouse-events', (event, ignore, opts) => {
 });
 
 // Handle drag movement
-ipcMain.handle('set-window-position', (event, { x, y }) => {
+ipcMain.handle('set-window-position', (event, pos) => {
+  if (!pos || typeof pos.x !== 'number' || typeof pos.y !== 'number') return;
+  if (!isFinite(pos.x) || !isFinite(pos.y)) return;
   if (mainWindow) {
     const config = loadConfig();
     if (!config.window_locked) {
-      mainWindow.setPosition(Math.round(x), Math.round(y));
+      mainWindow.setPosition(Math.round(pos.x), Math.round(pos.y));
     }
   }
 });
 
 // Save robot scale from renderer
 ipcMain.handle('save-robot-scale', (event, scale) => {
+  if (typeof scale !== 'number' || !isFinite(scale)) return;
   const config = loadConfig();
   config.robot_scale = Math.max(0.3, Math.min(1.5, scale));
   saveConfig(config);

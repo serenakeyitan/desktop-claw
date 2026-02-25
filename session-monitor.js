@@ -30,6 +30,7 @@ const EventEmitter = require('events');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const log = require('./logger');
 
 // If a process consumes less than this many CPU-seconds per poll interval,
 // it is considered idle (waiting at the prompt). A truly idle Claude process
@@ -205,12 +206,16 @@ class SessionMonitor extends EventEmitter {
           // Get process cwd via lsof
           let cwd = null;
           try {
-            const lsofOut = execSync(
-              `lsof -a -d cwd -p ${pid} -Fn 2>/dev/null | grep "^n/"`,
+            const { execFileSync } = require('child_process');
+            const lsofOut = execFileSync(
+              'lsof',
+              ['-a', '-d', 'cwd', '-p', String(pid), '-Fn'],
               { encoding: 'utf8', timeout: 3000 }
             ).trim();
-            if (lsofOut) {
-              cwd = lsofOut.replace(/^n/, '');
+            // Extract the path line starting with "n/"
+            const pathLine = lsofOut.split('\n').find(l => l.startsWith('n/'));
+            if (pathLine) {
+              cwd = pathLine.slice(1); // remove leading 'n'
             }
           } catch { /* lsof might fail */ }
 
@@ -458,7 +463,7 @@ class SessionMonitor extends EventEmitter {
         const elapsed = sess.elapsedMs > 0
           ? ` (running ${this.formatDuration(sess.elapsedMs)})`
           : '';
-        console.log(`Session detected: ${sess.project || sess.id}${elapsed}`);
+        log(`Session detected: ${sess.project || sess.id}${elapsed}`);
         this.emit('session-started', { ...session, status: 'unknown' });
       } else {
         // Existing session — update and track CPU delta
@@ -496,7 +501,7 @@ class SessionMonitor extends EventEmitter {
             existing.busySince = null;
 
             if (busyMs >= MIN_BUSY_DURATION_MS) {
-              console.log(`Session task finished: ${existing.project || existing.id} (ran for ${busyDuration})`);
+              log(`Session task finished: ${existing.project || existing.id} (ran for ${busyDuration})`);
               this.emit('session-task-finished', {
                 id: existing.id,
                 pid: existing.pid,
@@ -505,7 +510,7 @@ class SessionMonitor extends EventEmitter {
                 busyDuration,
               });
             } else {
-              console.log(`Session idle: ${existing.project || existing.id} (busy only ${busyDuration}, skipping notification)`);
+              log(`Session idle: ${existing.project || existing.id} (busy only ${busyDuration}, skipping notification)`);
             }
           } else if (!wasActive && !isIdle) {
             // Transition: idle -> busy (task started)
@@ -513,7 +518,7 @@ class SessionMonitor extends EventEmitter {
             existing.idlePolls = 0;
             existing.busySince = new Date();
 
-            console.log(`Session task started: ${existing.project || existing.id} (CPU delta ${cpuDelta.toFixed(1)}s)`);
+            log(`Session task started: ${existing.project || existing.id} (CPU delta ${cpuDelta.toFixed(1)}s)`);
             this.emit('session-task-started', {
               id: existing.id,
               pid: existing.pid,
@@ -532,7 +537,7 @@ class SessionMonitor extends EventEmitter {
         const duration = session.elapsedMs > 0
           ? this.formatDuration(session.elapsedMs)
           : 'unknown';
-        console.log(`Session ended: ${session.project || id} (was running ${duration})`);
+        log(`Session ended: ${session.project || id} (was running ${duration})`);
 
         this.emit('session-ended', {
           ...session,
@@ -571,7 +576,7 @@ class SessionMonitor extends EventEmitter {
   }
 
   start() {
-    console.log(`Session monitor started (polling every ${this.pollIntervalMs / 1000}s, hybrid debug-file + process + SSH detection)`);
+    log(`Session monitor started (polling every ${this.pollIntervalMs / 1000}s, hybrid debug-file + process + SSH detection)`);
     this.poll();
     this.pollTimer = setInterval(() => this.poll(), this.pollIntervalMs);
   }

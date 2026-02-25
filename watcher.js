@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const EventEmitter = require('events');
+const log = require('./logger');
 
 class LogWatcher extends EventEmitter {
   constructor() {
@@ -62,9 +63,9 @@ class LogWatcher extends EventEmitter {
 
           this.watchers.push(watcher);
           this.watchedPaths.add(logPath); // Mark as watched
-          console.log(`Watching logs at: ${logPath}`);
+          log(`Watching logs at: ${logPath}`);
         } catch (error) {
-          console.log(`Could not watch ${logPath}:`, error.message);
+          log(`Could not watch ${logPath}:`, error.message);
         }
       }
     });

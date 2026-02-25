@@ -222,9 +222,9 @@ body {
 }
 
 .github-icon-text {
-  font-size: 8px;
-  font-weight: bold;
-  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .social-field input {

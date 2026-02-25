@@ -34,18 +34,19 @@ class StatsDisplay {
       // Update bar fill
       this.tokenFill.style.width = `${pct}%`;
 
-      // Update bar color based on percentage
+      // Update bar color based on usage percentage
+      // pct = % used (0 = fresh, 100 = exhausted)
       this.tokenFill.classList.remove('high', 'medium', 'low');
-      if (pct > 60) {
-        this.tokenFill.classList.add('high');
-      } else if (pct > 30) {
-        this.tokenFill.classList.add('medium');
+      if (pct < 40) {
+        this.tokenFill.classList.add('high');   // green — plenty remaining
+      } else if (pct < 70) {
+        this.tokenFill.classList.add('medium'); // yellow — moderate usage
       } else {
-        this.tokenFill.classList.add('low');
+        this.tokenFill.classList.add('low');    // red — running low
       }
 
-      // Handle zero tokens state
-      if (pct === 0) {
+      // Handle near-exhaustion state
+      if (pct >= 90) {
         this.tokenPercentage.classList.add('urgent');
       } else {
         this.tokenPercentage.classList.remove('urgent');

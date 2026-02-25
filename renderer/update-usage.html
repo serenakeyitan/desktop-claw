@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      padding: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    h3 { margin-top: 0; }
+    input {
+      width: 100%;
+      padding: 8px;
+      font-size: 16px;
+      border: none;
+      border-radius: 4px;
+      margin: 10px 0;
+      box-sizing: border-box;
+    }
+    button {
+      background: white;
+      color: #667eea;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      font-size: 14px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    button:hover {
+      opacity: 0.9;
+    }
+    .info {
+      font-size: 12px;
+      opacity: 0.9;
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+<body>
+  <h3>Update Usage</h3>
+  <div class="info">Enter your current usage percentage</div>
+  <input type="number" id="usage" placeholder="Enter percentage (0-100)" min="0" max="100" autofocus>
+  <div style="margin-top: 20px;">
+    <button id="save-btn">Save</button>
+    <button id="cancel-btn">Cancel</button>
+  </div>
+  <script>
+    document.getElementById('save-btn').addEventListener('click', save);
+    document.getElementById('cancel-btn').addEventListener('click', () => {
+      window.usageAPI.close();
+    });
+    document.getElementById('usage').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') save();
+    });
+
+    async function save() {
+      const value = document.getElementById('usage').value;
+      const percentage = parseInt(value);
+      if (!isNaN(percentage) && percentage >= 0 && percentage <= 100) {
+        await window.usageAPI.save(percentage);
+        window.usageAPI.close();
+      } else {
+        alert('Please enter a valid percentage between 0 and 100');
+      }
+    }
+  </script>
+</body>
+</html>

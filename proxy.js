@@ -2,6 +2,7 @@ const http = require('http');
 const https = require('https');
 const url = require('url');
 const EventEmitter = require('events');
+const log = require('./logger');
 
 class ProxyServer extends EventEmitter {
   constructor(port = 9999, apiKey = '') {
@@ -24,11 +25,11 @@ class ProxyServer extends EventEmitter {
     });
 
     this.server.listen(this.port, 'localhost', () => {
-      console.log(`Proxy server listening on localhost:${this.port}`);
+      log(`Proxy server listening on localhost:${this.port}`);
     });
 
     this.server.on('error', (error) => {
-      console.error('Proxy server error:', error);
+      log.error('Proxy server error:', error);
     });
   }
 
@@ -85,7 +86,7 @@ class ProxyServer extends EventEmitter {
     });
 
     proxyReq.on('error', (error) => {
-      console.error('Proxy request error:', error);
+      log.error('Proxy request error:', error);
       clientRes.writeHead(500);
       clientRes.end('Proxy Error');
       if (isAnthropicRequest) {
@@ -122,12 +123,12 @@ class ProxyServer extends EventEmitter {
     });
 
     serverSocket.on('error', (error) => {
-      console.error('Tunnel error:', error);
+      log.error('Tunnel error:', error);
       clientSocket.end();
     });
 
     clientSocket.on('error', (error) => {
-      console.error('Client socket error:', error);
+      log.error('Client socket error:', error);
       serverSocket.end();
     });
   }

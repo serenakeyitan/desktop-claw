@@ -14,6 +14,7 @@
 
 const { getSupabase, getCurrentUser } = require('./supabase-client');
 const EventEmitter = require('events');
+const log = require('./logger');
 
 const SYNC_INTERVAL_MS = 2 * 60 * 1000;      // push usage every 2 min
 const HEARTBEAT_INTERVAL_MS = 60 * 1000;      // status heartbeat every 1 min
@@ -33,18 +34,18 @@ class SocialSync extends EventEmitter {
   async start() {
     // Initial sync
     await this.syncUsage().catch(err =>
-      console.error('SocialSync: initial sync failed', err.message));
+      log.error('SocialSync: initial sync failed', err.message));
 
     // Periodic sync
     this.syncTimer = setInterval(() => {
       this.syncUsage().catch(err =>
-        console.error('SocialSync: sync failed', err.message));
+        log.error('SocialSync: sync failed', err.message));
     }, SYNC_INTERVAL_MS);
 
     // Status heartbeat
     this.heartbeatTimer = setInterval(() => {
       this.pushHeartbeat().catch(err =>
-        console.error('SocialSync: heartbeat failed', err.message));
+        log.error('SocialSync: heartbeat failed', err.message));
     }, HEARTBEAT_INTERVAL_MS);
 
     // Send an initial heartbeat
@@ -88,7 +89,7 @@ class SocialSync extends EventEmitter {
 
     const { error } = await sb.from('usage_logs').insert(rows);
     if (error) {
-      console.error('SocialSync: insert usage_logs failed', error.message);
+      log.error('SocialSync: insert usage_logs failed', error.message);
       return;
     }
 
@@ -98,7 +99,7 @@ class SocialSync extends EventEmitter {
     if (this.usageDB.markSynced) {
       this.usageDB.markSynced(latest.timestamp);
     }
-    console.log(`SocialSync: pushed ${rows.length} usage entries`);
+    log(`SocialSync: pushed ${rows.length} usage entries`);
 
     this.emit('synced', { count: rows.length });
   }
@@ -135,7 +136,7 @@ class SocialSync extends EventEmitter {
       this.subscriptionTier = tier;
       // Sync tier to profile
       this._syncTierToProfile(tier).catch(err =>
-        console.error('SocialSync: failed to sync tier', err.message));
+        log.error('SocialSync: failed to sync tier', err.message));
     }
   }
 
@@ -154,9 +155,9 @@ class SocialSync extends EventEmitter {
       .eq('id', user.id);
 
     if (error) {
-      console.error('SocialSync: profile tier update failed', error.message);
+      log.error('SocialSync: profile tier update failed', error.message);
     } else {
-      console.log(`SocialSync: subscription tier synced → ${tier}`);
+      log(`SocialSync: subscription tier synced → ${tier}`);
     }
   }
 
@@ -181,7 +182,7 @@ class SocialSync extends EventEmitter {
       .upsert({ user_id: user.id, ...update }, { onConflict: 'user_id' });
 
     if (error) {
-      console.error('SocialSync: heartbeat upsert failed', error.message);
+      log.error('SocialSync: heartbeat upsert failed', error.message);
     }
   }
 
@@ -206,7 +207,7 @@ class SocialSync extends EventEmitter {
       client_today: this._localDateStr(),
     });
     if (error) {
-      console.error('SocialSync: get_friend_ranking failed', error.message);
+      log.error('SocialSync: get_friend_ranking failed', error.message);
       return [];
     }
     return data || [];
@@ -226,7 +227,7 @@ class SocialSync extends EventEmitter {
       client_today: this._localDateStr(),
     });
     if (error) {
-      console.error('SocialSync: get_global_ranking failed', error.message);
+      log.error('SocialSync: get_global_ranking failed', error.message);
       return [];
     }
     return data || [];
@@ -271,7 +272,7 @@ class SocialSync extends EventEmitter {
       .limit(20);
 
     if (error) {
-      console.error('SocialSync: getUnreadPokes failed', error.message);
+      log.error('SocialSync: getUnreadPokes failed', error.message);
       return [];
     }
 
@@ -298,7 +299,7 @@ class SocialSync extends EventEmitter {
       .in('id', pokeIds);
 
     if (error) {
-      console.error('SocialSync: markPokesRead failed', error.message);
+      log.error('SocialSync: markPokesRead failed', error.message);
     }
   }
 
@@ -330,7 +331,7 @@ class SocialSync extends EventEmitter {
       .eq('user_id', user.id);
 
     if (error) {
-      console.error('SocialSync: getFriends failed', error.message);
+      log.error('SocialSync: getFriends failed', error.message);
       return [];
     }
 
