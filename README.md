@@ -1,167 +1,143 @@
-# 🤖 All Day Poke Desktop Pet
+# All Day Poke
 
-A minimalist desktop widget that floats over all windows, showing real-time Claude API token usage with an animated pixel-art robot that reacts to API activity.
+A desktop pet that tracks your Claude Code usage and lets you vibe-code with friends. It sits on top of all your windows as a tiny pixel robot, shows live session status, and syncs with a social leaderboard so you can see who's coding right now.
 
-![All Day Poke](claude-code.png)
+![All Day Poke](icon.png)
 
-## ✨ Features
-
-- **Real-time token usage monitoring** - Shows your Anthropic API token usage as a percentage bar
-- **Animated pixel-art robot** - Orange/terracotta themed robot that reacts to API activity
-- **Auto-detection of API calls** - Three detection methods:
-  - HTTP Proxy (most accurate)
-  - Log file watching
-  - Token usage changes
-- **Countdown timer** - Shows time until token reset
-- **Always on top** - Floats above all windows
-- **Draggable** - Click and drag the robot to reposition
-- **Transparent background** - Clean, minimal design
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Node.js installed (v16 or higher)
-- Anthropic API key (get one at https://console.anthropic.com/settings/keys)
-
-### Launch Instructions
-
-1. **Install dependencies** (if not already done):
-   ```bash
-   npm install
-   ```
-
-2. **Set your API key** (choose one method):
-
-   **Option A - Environment Variable (Recommended):**
-   ```bash
-   export ANTHROPIC_API_KEY="sk-ant-api03-your-key-here"
-   npm start
-   ```
-
-   **Option B - Launch and use Setup Wizard:**
-   ```bash
-   npm start
-   # The setup wizard will appear on first launch
-   ```
-
-   **Option C - Demo Mode (no API key):**
-   ```bash
-   npm start
-   # Click "Skip" in the setup wizard
-   ```
-
-3. **The robot will appear** in the bottom-right corner of your screen!
-
-## 🎮 Controls
-
-- **Left Click + Drag** on robot: Move the widget
-- **Right Click**: Open context menu
-  - Reload
-  - Open Config
-  - Lock Position
-  - DevTools (for debugging)
-  - Quit
-
-## 🔧 Configuration
-
-### For Activity Detection
-
-To enable accurate activity detection when using Claude Code, configure it to use the local proxy:
+## Install
 
 ```bash
-# Add to ~/.zshrc or ~/.bashrc
-export ANTHROPIC_API_BASE="http://localhost:9999"
+curl -fsSL https://raw.githubusercontent.com/serenakeyitan/desktop-claw/main/install.sh | bash
 ```
 
-Then restart your terminal and Claude Code will route through the proxy.
+Or manually:
 
-### Config File Location
+```bash
+git clone https://github.com/serenakeyitan/desktop-claw.git
+cd desktop-claw
+npm install
+npx alldaypoke
+```
 
-The config file is automatically created at:
-- macOS/Linux: `~/.alldaypoke/config.json`
-- Windows: `%USERPROFILE%\.alldaypoke\config.json`
+The app auto-starts on login once installed.
 
-### Config Options
+## What it does
+
+### Live session tracking
+
+The robot detects all running Claude Code sessions automatically — no configuration needed. It scans debug files, matches processes, and even picks up SSH sessions to remote machines. The bubble above the robot shows all active projects in green:
+
+```
+4 running: desktop_bot, peer-kael-claw, keyitan, remote:kael@59.110.165.69
+```
+
+Sessions actively executing tasks get a glow effect. When a task finishes, you get a desktop notification.
+
+### Usage monitoring
+
+Reads your Claude usage directly from the `/status` endpoint using your Claude Code OAuth credentials (pulled from macOS Keychain automatically). Shows:
+
+- Token usage percentage with color-coded bar (green / yellow / red)
+- Subscription tier (Pro, Max, Free)
+- Reset countdown timer
+- Per-project usage attribution — see which project is burning your tokens
+
+### Social features
+
+Sign up with a username, add friends via invite codes, and see who's vibing:
+
+- **Live status** — see which friends have Claude Code open right now, with project names
+- **Friend rankings** — compare usage across today, 7 days, 30 days, or all time
+- **Global leaderboard** — top 50 users by usage
+- **Poke** — tap a friend to send a poke. Their robot does a head-pat animation with floating hearts
+- **Invite links** — share `alldaypoke://invite/CODE` deep links to add friends instantly
+
+### The robot
+
+A 12x8 pixel-art robot in terracotta orange that floats over all your windows:
+
+- Eyes light up white when Claude is active, go dark when idle
+- Vibrates and glows during API calls
+- Blinks randomly when idle
+- Blushes pink and squints when poked by a friend
+- Scroll wheel to resize (0.3x to 1.5x)
+- Drag to reposition anywhere on screen
+- Click-through on transparent areas so it never blocks your work
+
+## Controls
+
+| Action | What it does |
+|--------|-------------|
+| Hover over robot | Show usage bubble with stats |
+| Drag robot | Reposition the widget |
+| Scroll wheel | Resize the robot |
+| Right-click | Context menu |
+
+### Context menu
+
+- Change Authentication
+- Reload
+- Open Config
+- Usage Ranking (per-project breakdown)
+- Social Ranking (friends + global)
+- Update Usage (manual entry)
+- Lock Position
+- DevTools
+- Quit
+
+## Configuration
+
+Config lives at `~/.alldaypoke/config.json`:
 
 ```json
 {
-  "poll_interval_seconds": 30,        // How often to check token usage
-  "activity_timeout_seconds": 10,     // Seconds before returning to idle
-  "proxy_port": 9999,                 // Local proxy port
-  "detection_method": "auto",         // auto|proxy|logs|tokens
-  "position": { "x": null, "y": null }, // Window position
-  "window_locked": false              // Lock window position
+  "poll_interval_seconds": 30,
+  "activity_timeout_seconds": 10,
+  "proxy_port": 9999,
+  "detection_method": "auto",
+  "position": { "x": null, "y": null },
+  "robot_scale": 0.6,
+  "window_locked": false
 }
 ```
 
-## 🤖 Robot States
+## Architecture
 
-The robot has two automatic states:
-
-| State | Visual | Trigger |
-|-------|--------|---------|
-| **IDLE** | Slow floating, occasional blink | No API activity for 10+ seconds |
-| **ACTIVE** | Vibrating, bright eyes, glowing | API call detected |
-
-## 📊 Token Bar Colors
-
-- 🟢 **Green** (<40% used): Plenty of tokens remaining
-- 🟡 **Yellow** (40-70% used): Moderate usage
-- 🔴 **Red** (>70% used): Running low, be careful!
-
-## 🐛 Troubleshooting
-
-### "No API key" message
-- Make sure `ANTHROPIC_API_KEY` environment variable is set
-- Or enter your key in the setup wizard
-
-### Robot not detecting activity
-1. Check if the proxy is running (port 9999)
-2. Ensure Claude Code is configured to use the proxy
-3. Check if log watching has permissions
-
-### Widget off-screen
-- Delete position from config file and restart
-- Widget will reset to bottom-right corner
-
-### Can't see the robot
-- Make sure no full-screen apps are running
-- Check if transparency is supported on your system
-- Try reloading with right-click menu
-
-## 🛠 Development
-
-### Run in development mode:
-```bash
-npm run dev
-```
-
-### Project Structure:
 ```
 desktop_bot/
-├── main.js              # Electron main process
-├── preload.js           # IPC bridge
-├── proxy.js             # HTTP proxy server
-├── watcher.js           # Log file watcher
-├── usage-poller.js      # API usage polling
+├── main.js                    # Electron main process, IPC, windows
+├── session-monitor.js         # Claude Code session detection (debug files + ps + SSH)
+├── usage-tracker.js           # Per-project usage attribution
+├── usage-db.js                # Local usage history (JSON-backed)
+├── auto-usage-updater.js      # Polls Claude /status endpoint
+├── claude-oauth-usage-tracker.js  # OAuth credential handling
+├── social-sync.js             # Supabase social sync (status, rankings, pokes)
+├── social-backend.js          # Server-side social queries
+├── auth-manager.js            # Authentication (OAuth, API key, keychain)
+├── logger.js                  # Dev/prod logging
+├── proxy.js                   # Local HTTP proxy for API interception
+├── watcher.js                 # Log file watcher
+├── alldaypoke                 # CLI launcher script
 ├── renderer/
-│   ├── index.html       # Main widget UI
-│   ├── setup.html       # Setup wizard
-│   ├── style.css        # Widget styles
-│   ├── robot.js         # Robot SVG generator
-│   ├── stats.js         # Stats display logic
-│   └── renderer.js      # Main renderer script
-└── config/
-    └── defaults.json    # Default configuration
+│   ├── index.html + renderer.js + style.css    # Main widget
+│   ├── robot.js                                # Pixel-art robot renderer
+│   ├── social.html + social.js + social.css    # Social window
+│   ├── login.html + login.css                  # Auth flow
+│   ├── ranking.html + ranking.js + ranking.css # Usage rankings
+│   ├── setup.html + setup.css                  # First-run wizard
+│   └── update-usage.html                       # Manual usage input
+├── preload.js                 # Main window IPC bridge
+├── preload-social.js          # Social window IPC bridge
+└── preload-usage.js           # Usage modal IPC bridge
 ```
 
-## 📝 Notes
+## Building
 
-- The app stores your API key as an environment variable for the session
-- Window position is saved automatically when you drag it
-- The proxy only accepts connections from localhost for security
-- All animations are CSS-based for smooth performance
+```bash
+npm run dist          # macOS DMG (universal)
+npm run dist:all      # macOS + Windows + Linux
+```
 
-## 🎉 Enjoy your new desktop companion!
+## License
 
-The robot will keep you company while monitoring your Claude API usage. Happy coding! 🚀
+MIT
