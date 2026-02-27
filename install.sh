@@ -39,11 +39,11 @@ ok "macOS detected"
 info "Fetching latest release..."
 
 # Get the latest .dmg URL from GitHub Releases
-DMG_URL=$(curl -fsSL "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" \
+DMG_URL=$(curl -sSL "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" 2>/dev/null \
   | grep -o '"browser_download_url": *"[^"]*\.dmg"' \
   | head -1 \
   | sed 's/"browser_download_url": *"//' \
-  | sed 's/"$//')
+  | sed 's/"$//' || true)
 
 if [[ -z "$DMG_URL" ]]; then
   # Fallback: try to find any .dmg in latest release assets
