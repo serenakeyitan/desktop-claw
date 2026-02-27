@@ -418,3 +418,106 @@ body.dragging #widget-container {
   color: #666;
   font-size: 8px;
 }
+
+/* ── Onboarding Tooltip ── */
+#onboarding-tooltip {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1a1a;
+  border: 2px solid #cd7f5d;
+  padding: 10px 14px;
+  min-width: 170px;
+  max-width: 178px;
+  z-index: 100;
+  pointer-events: auto;
+  animation: onboard-fade-in 0.4s ease;
+}
+
+#onboarding-tooltip.above {
+  bottom: 80px;
+}
+
+#onboarding-tooltip.below {
+  top: 10px;
+}
+
+@keyframes onboard-fade-in {
+  0% { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* Terracotta accent dots on corners */
+#onboarding-tooltip::before,
+#onboarding-tooltip::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #cd7f5d;
+}
+#onboarding-tooltip::before { top: -2px; left: -2px; }
+#onboarding-tooltip::after { top: -2px; right: -2px; }
+
+/* Tail pointing down */
+#onboarding-tail {
+  width: 0;
+  height: 0;
+  margin: 0 auto;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #cd7f5d;
+}
+
+#onboarding-step {
+  color: #cd7f5d;
+  font-size: 7px;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+#onboarding-text {
+  color: #ddd;
+  font-size: 10px;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+#onboarding-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+#onboarding-dots {
+  display: flex;
+  gap: 4px;
+}
+
+#onboarding-dots .dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #333;
+}
+
+#onboarding-dots .dot.active {
+  background: #cd7f5d;
+}
+
+#onboarding-next {
+  background: #cd7f5d;
+  color: #0d0d0d;
+  border: none;
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+#onboarding-next:hover {
+  background: #d9936f;
+}

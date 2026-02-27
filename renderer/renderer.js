@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initializeStats();
   setupEventListeners();
   setupIPC();
+  setupOnboarding();
 });
 
 async function initializeRobot() {
@@ -98,10 +99,17 @@ function setupClickThrough() {
     return el && bubble.contains(el);
   }
 
+  function isOverOnboarding(e) {
+    if (!onboardingEl) return false;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    return el && onboardingEl.contains(el);
+  }
+
   document.addEventListener('mousemove', (e) => {
     const overRobot = isOverRobot(e);
     const overBubble = isOverBubble(e);
-    const overContent = overRobot || overBubble;
+    const overOnboarding = isOverOnboarding(e);
+    const overContent = overRobot || overBubble || overOnboarding;
 
     // Toggle bubble visibility: show only when hovering robot or bubble itself
     if (bubble) {
@@ -311,6 +319,95 @@ function setupIPC() {
         robot.setState('idle');
       }
     }
+  });
+}
+
+// ── Onboarding flow ──────────────────────────────────────────────────────
+
+const ONBOARDING_STEPS = [
+  {
+    label: 'Welcome',
+    text: 'Meet your robot! It lives on your desktop and tracks your Claude Code usage.',
+    position: 'above',
+  },
+  {
+    label: 'Hover',
+    text: 'Hover over the robot to see live stats — usage %, reset timer, and active sessions.',
+    position: 'above',
+  },
+  {
+    label: 'Resize',
+    text: 'Drag the tiny handle at the bottom-right corner of the robot to resize it.',
+    position: 'above',
+  },
+  {
+    label: 'Right-click',
+    text: 'Right-click for the menu — Usage Ranking, Social Ranking, settings, and more.',
+    position: 'above',
+  },
+];
+
+let onboardingStep = 0;
+let onboardingEl = null;
+
+function startOnboarding() {
+  onboardingStep = 0;
+  showOnboardingStep();
+}
+
+function showOnboardingStep() {
+  // Remove previous tooltip
+  if (onboardingEl) {
+    onboardingEl.remove();
+    onboardingEl = null;
+  }
+
+  if (onboardingStep >= ONBOARDING_STEPS.length) {
+    // Done — notify main process
+    window.electronAPI.onboardingDone();
+    return;
+  }
+
+  const step = ONBOARDING_STEPS[onboardingStep];
+  const container = document.getElementById('widget-container');
+
+  const tooltip = document.createElement('div');
+  tooltip.id = 'onboarding-tooltip';
+  tooltip.classList.add(step.position);
+
+  // Build dots
+  const dots = ONBOARDING_STEPS.map((_, i) =>
+    `<span class="dot${i <= onboardingStep ? ' active' : ''}"></span>`
+  ).join('');
+
+  const isLast = onboardingStep === ONBOARDING_STEPS.length - 1;
+
+  tooltip.innerHTML = `
+    <div id="onboarding-step">${step.label}</div>
+    <div id="onboarding-text">${step.text}</div>
+    <div id="onboarding-actions">
+      <div id="onboarding-dots">${dots}</div>
+      <button id="onboarding-next">${isLast ? 'Done' : 'Next'}</button>
+    </div>
+    <div id="onboarding-tail"></div>
+  `;
+
+  container.appendChild(tooltip);
+  onboardingEl = tooltip;
+
+  // Make sure we capture mouse events on the tooltip
+  window.electronAPI.setIgnoreMouseEvents(false);
+
+  tooltip.querySelector('#onboarding-next').addEventListener('click', (e) => {
+    e.stopPropagation();
+    onboardingStep++;
+    showOnboardingStep();
+  });
+}
+
+function setupOnboarding() {
+  window.electronAPI.onStartOnboarding(() => {
+    startOnboarding();
   });
 }
 

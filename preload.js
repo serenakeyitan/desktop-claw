@@ -45,6 +45,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('poke-received', (event, data) => callback(data));
   },
 
+  onStartOnboarding: (callback) => {
+    ipcRenderer.on('start-onboarding', (event) => callback());
+  },
+
+  onboardingDone: () => ipcRenderer.invoke('onboarding-done'),
+
   // Remove listeners
   removeAllListeners: () => {
     ipcRenderer.removeAllListeners('token-update');
@@ -52,5 +58,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners('reset-tick');
     ipcRenderer.removeAllListeners('session-update');
     ipcRenderer.removeAllListeners('poke-received');
+    ipcRenderer.removeAllListeners('start-onboarding');
   }
 });

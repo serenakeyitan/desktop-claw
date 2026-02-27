@@ -102,6 +102,7 @@ let socialWindow;
 let socialSync;
 let lastUsagePct = null;  // tracks last OAuth utilization for delta computation
 let pendingInviteCode = null;  // queued invite code from deep link, processed after login
+let pendingWindowAfterLogin = null;  // window to open after login completes ('social')
 let currentState = 'idle';
 let lastActivityTime = Date.now();
 let windowPosition = null;
@@ -726,7 +727,22 @@ ipcMain.handle('complete-setup', async (event, authType) => {
     createMainWindow();
   }
 
+  // Trigger onboarding for first-time users
+  if (!config.onboarding_done) {
+    setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('start-onboarding');
+      }
+    }, 1500);
+  }
+
   return { success: true };
+});
+
+ipcMain.handle('onboarding-done', () => {
+  const config = loadConfig();
+  config.onboarding_done = true;
+  saveConfig(config);
 });
 
 ipcMain.handle('track-message', () => {
@@ -832,6 +848,16 @@ function openSocialWindow() {
   socialWindow.on('closed', () => { socialWindow = null; });
 }
 
+// Open the window that was pending before login (e.g., Social Ranking)
+function openPendingWindow() {
+  const target = pendingWindowAfterLogin;
+  pendingWindowAfterLogin = null;
+  if (target === 'social') {
+    // Small delay so the login window fully closes first
+    setTimeout(() => openSocialWindow(), 300);
+  }
+}
+
 // ── Social: start sync after login ──────────────────────────────────────
 
 async function startSocialSync() {
@@ -893,6 +919,7 @@ ipcMain.handle('social-sign-in', async (event, email, password) => {
   // Special '__continue__' signal from the success panel
   if (email === '__continue__') {
     if (loginWindow && !loginWindow.isDestroyed()) loginWindow.close();
+    openPendingWindow();
     return { success: true };
   }
 
@@ -914,6 +941,7 @@ ipcMain.handle('social-sign-in', async (event, email, password) => {
       pendingInviteCode = null;
     }
     if (loginWindow && !loginWindow.isDestroyed()) loginWindow.close();
+    openPendingWindow();
     return { success: true };
   } catch (err) {
     return { error: err.message };
@@ -1132,39 +1160,9 @@ ipcMain.handle('show-context-menu', (event) => {
         if (user) {
           openSocialWindow();
         } else {
+          pendingWindowAfterLogin = 'social';
           openLoginWindow();
         }
-      }
-    },
-    {
-      label: '📊 Update Usage',
-      click: () => {
-        // Create a secure input window for usage update (no nodeIntegration)
-        const inputWindow = new BrowserWindow({
-          width: 400,
-          height: 200,
-          resizable: false,
-          minimizable: false,
-          maximizable: false,
-          webPreferences: {
-            nodeIntegration: false,
-            contextIsolation: true,
-            preload: path.join(__dirname, 'preload-usage.js')
-          },
-          title: 'Update Usage'
-        });
-
-        // Track this window for the close-usage-window IPC
-        inputWindow.webContents._usageWindow = true;
-
-        inputWindow.loadFile(path.join(__dirname, 'renderer', 'update-usage.html'));
-
-        inputWindow.on('close', () => {
-          // Reload main window to show new usage
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.reload();
-          }
-        });
       }
     },
     { type: 'separator' },
