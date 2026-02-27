@@ -10,7 +10,7 @@ A desktop pet that tracks your Claude Code usage and lets you vibe-code with fri
 curl -fsSL https://raw.githubusercontent.com/serenakeyitan/desktop-claw/main/install.sh | bash
 ```
 
-This downloads the latest DMG from [GitHub Releases](https://github.com/serenakeyitan/desktop-claw/releases), installs to `/Applications`, and you're good to go. Open it from Launchpad or `/Applications/All Day Poke.app`.
+This downloads the latest DMG, installs to `/Applications`, and launches the app automatically. It also starts on its own every time you log in — no extra setup needed.
 
 Or manually:
 
