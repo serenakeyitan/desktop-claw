@@ -189,29 +189,36 @@ ok "Downloaded $(du -h "$DMG_FILE" | cut -f1 | xargs)"
 # ── Mount and install ───────────────────────────────────────────────────
 
 info "Installing..."
-echo ""
 
-# Run install in background for hints animation
-(
-  MOUNT_POINT=$(hdiutil attach "$DMG_FILE" -nobrowse -mountpoint "$TMPDIR_DL/mnt" 2>/dev/null | grep -o '/Volumes/.*' | head -1)
-  [[ -z "$MOUNT_POINT" ]] && MOUNT_POINT="$TMPDIR_DL/mnt"
+# Mount the DMG (let macOS choose the mount point under /Volumes)
+MOUNT_OUTPUT=$(hdiutil attach "$DMG_FILE" -nobrowse 2>/dev/null) || fail "Could not mount DMG."
+MOUNT_POINT=$(echo "$MOUNT_OUTPUT" | grep -o '/Volumes/.*' | head -1)
 
-  APP_SRC=$(find "$MOUNT_POINT" -maxdepth 1 -name "*.app" -print -quit 2>/dev/null)
-  if [[ -z "$APP_SRC" ]]; then
-    hdiutil detach "$MOUNT_POINT" -quiet 2>/dev/null || true
-    rm -rf "$TMPDIR_DL"
-    exit 1
-  fi
+if [[ -z "$MOUNT_POINT" ]]; then
+  fail "Could not determine mount point."
+fi
 
-  [[ -d "$INSTALL_DIR/$APP_NAME" ]] && rm -rf "$INSTALL_DIR/$APP_NAME"
-  cp -R "$APP_SRC" "$INSTALL_DIR/"
+# Find the .app inside
+APP_SRC=$(find "$MOUNT_POINT" -maxdepth 1 -name "*.app" -print -quit 2>/dev/null)
+
+if [[ -z "$APP_SRC" ]]; then
   hdiutil detach "$MOUNT_POINT" -quiet 2>/dev/null || true
   rm -rf "$TMPDIR_DL"
-  xattr -rd com.apple.quarantine "$INSTALL_DIR/$APP_NAME" 2>/dev/null || true
-) &
-INSTALL_PID=$!
-progress_with_hints $INSTALL_PID
-wait $INSTALL_PID || fail "Installation failed. Could not find .app in DMG."
+  fail "Could not find .app in DMG."
+fi
+
+# Remove old version if exists
+[[ -d "$INSTALL_DIR/$APP_NAME" ]] && rm -rf "$INSTALL_DIR/$APP_NAME"
+
+# Copy to Applications
+cp -R "$APP_SRC" "$INSTALL_DIR/"
+
+# Cleanup
+hdiutil detach "$MOUNT_POINT" -quiet 2>/dev/null || true
+rm -rf "$TMPDIR_DL"
+
+# Remove quarantine attribute (app is unsigned)
+xattr -rd com.apple.quarantine "$INSTALL_DIR/$APP_NAME" 2>/dev/null || true
 
 ok "Installed to /Applications"
 
