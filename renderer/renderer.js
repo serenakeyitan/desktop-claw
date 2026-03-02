@@ -285,33 +285,35 @@ function setupIPC() {
     const sessionText = document.getElementById('session-text');
     if (!sessionText) return;
 
-    // Only show sessions that are actively running (busy)
-    const busySessions = (data.sessions || []).filter(s => s.busy);
-
-    if (busySessions.length > 0) {
-      const sorted = [...busySessions].sort((a, b) =>
-        (a.project || '').localeCompare(b.project || '')
-      );
+    if (data.count > 0) {
+      // Sort busy first, then alphabetically
+      const sorted = [...data.sessions].sort((a, b) => {
+        if (b.busy !== a.busy) return (b.busy ? 1 : 0) - (a.busy ? 1 : 0);
+        return (a.project || '').localeCompare(b.project || '');
+      });
       const shown = sorted.slice(0, 5);
+      const busyCount = data.busyCount || 0;
 
+      // Busy sessions highlighted, idle sessions dimmed
       const items = shown.map(s => {
         const name = s.project || 'unknown';
-        return `<span class="session-active">${name}</span>`;
+        const cls = s.busy ? 'session-active' : 'session-idle';
+        return `<span class="${cls}">${name}</span>`;
       });
 
-      const extra = busySessions.length > shown.length ? ` +${busySessions.length - shown.length}` : '';
-      const summary = `${busySessions.length} running`;
+      const extra = data.count > shown.length ? ` +${data.count - shown.length}` : '';
+      // Count only reflects running sessions
+      const summary = busyCount > 0 ? `${busyCount} running` : 'idle';
 
       sessionText.innerHTML =
-        `<span class="session-dot busy"></span>${summary}: ${items.join(', ')}${extra}`;
+        `<span class="session-dot ${busyCount > 0 ? 'busy' : 'idle'}"></span>${summary}: ${items.join(', ')}${extra}`;
 
-      // Update robot face — active when sessions are running
+      // Robot active only when sessions are busy
       if (robot) {
-        robot.setState('active');
+        robot.setState(busyCount > 0 ? 'active' : 'idle');
       }
     } else {
       sessionText.innerHTML = '';
-      // No sessions — robot goes idle
       if (robot) {
         robot.setState('idle');
       }

@@ -205,10 +205,10 @@ body {
   animation: none;
 }
 
-/* All detected sessions are live — show green */
-#session-text .session-live { color: #39ff14; }
-/* Actively executing a task — brighter with glow */
+/* Actively executing a task — bright green with glow */
 #session-text .session-active { color: #7fff5a; text-shadow: 0 0 4px rgba(57, 255, 20, 0.6); }
+/* Session exists but idle — dimmed */
+#session-text .session-idle { color: #555; }
 
 /* ── Robot Container ── */
 #robot-container {
