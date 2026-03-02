@@ -285,30 +285,27 @@ function setupIPC() {
     const sessionText = document.getElementById('session-text');
     if (!sessionText) return;
 
-    if (data.count > 0) {
-      // Sort busy first, then by project name
-      const sorted = [...data.sessions].sort((a, b) => {
-        if (b.busy !== a.busy) return (b.busy ? 1 : 0) - (a.busy ? 1 : 0);
-        return (a.project || '').localeCompare(b.project || '');
-      });
-      const shown = sorted.slice(0, 5);
-      const totalBusy = data.busyCount;
+    // Only show sessions that are actively running (busy)
+    const busySessions = (data.sessions || []).filter(s => s.busy);
 
-      // All detected sessions are live (process exists). Use "session-live"
-      // for all, with "session-active" added for busy ones (executing a task).
+    if (busySessions.length > 0) {
+      const sorted = [...busySessions].sort((a, b) =>
+        (a.project || '').localeCompare(b.project || '')
+      );
+      const shown = sorted.slice(0, 5);
+
       const items = shown.map(s => {
         const name = s.project || 'unknown';
-        const cls = s.busy ? 'session-live session-active' : 'session-live';
-        return `<span class="${cls}">${name}</span>`;
+        return `<span class="session-active">${name}</span>`;
       });
 
-      const extra = data.count > shown.length ? ` +${data.count - shown.length}` : '';
-      const summary = `${data.count} running`;
+      const extra = busySessions.length > shown.length ? ` +${busySessions.length - shown.length}` : '';
+      const summary = `${busySessions.length} running`;
 
       sessionText.innerHTML =
         `<span class="session-dot busy"></span>${summary}: ${items.join(', ')}${extra}`;
 
-      // Update robot face — active if any sessions exist
+      // Update robot face — active when sessions are running
       if (robot) {
         robot.setState('active');
       }
