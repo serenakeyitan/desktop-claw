@@ -42,7 +42,9 @@
       "preload.js",
       "preload-social.js",
       "preload-usage.js",
-      "renderer/**/*",
+      "preload-ranking.js",
+      "renderer/",
+      "config/",
       "watcher.js",
       "proxy.js",
       "usage-poller.js",
@@ -60,6 +62,7 @@
       "social-backend.js",
       "alldaypoke",
       "icon.png",
+      "headpat.gif",
       "package.json",
       "node_modules/**/*"
     ],
