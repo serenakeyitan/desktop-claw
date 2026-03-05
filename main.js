@@ -48,7 +48,61 @@ const SessionMonitor = require('./session-monitor');
 const UsageDB = require('./usage-db');
 const supabaseClient = require('./supabase-client');
 const SocialSync = require('./social-sync');
+const { getClaudeBinaryPath } = require('./claude-path');
 const log = require('./logger');
+
+// ── PATH enrichment for macOS GUI launches ────────────────────────────────
+// When launched from Finder / DMG (not a terminal), macOS gives Electron a
+// minimal PATH (/usr/bin:/bin:/usr/sbin:/sbin). This means `which claude`
+// and other lookups fail even though the CLI is installed. Prepend common
+// binary directories so child_process calls work the same as in a terminal.
+(function enrichPath() {
+  if (process.platform !== 'darwin') return;
+  const home = os.homedir();
+  const extra = [
+    '/usr/local/bin',
+    '/opt/homebrew/bin',
+    '/opt/homebrew/sbin',
+    path.join(home, '.nvm/versions/node'),   // parent — we glob below
+    path.join(home, '.local/bin'),
+    path.join(home, '.npm-global/bin'),
+    path.join(home, '.volta/bin'),
+  ];
+
+  // For nvm: find the latest installed node version directory
+  const nvmRoot = path.join(home, '.nvm/versions/node');
+  try {
+    if (fs.existsSync(nvmRoot)) {
+      const versions = fs.readdirSync(nvmRoot)
+        .filter(d => d.startsWith('v'))
+        .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+      if (versions.length > 0) {
+        extra.push(path.join(nvmRoot, versions[0], 'bin'));
+      }
+    }
+  } catch { /* ignore */ }
+
+  // For fnm: check common install location
+  const fnmRoot = path.join(home, 'Library/Application Support/fnm/node-versions');
+  try {
+    if (fs.existsSync(fnmRoot)) {
+      const versions = fs.readdirSync(fnmRoot)
+        .filter(d => d.startsWith('v'))
+        .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+      if (versions.length > 0) {
+        extra.push(path.join(fnmRoot, versions[0], 'installation/bin'));
+      }
+    }
+  } catch { /* ignore */ }
+
+  const current = process.env.PATH || '';
+  const dirs = current.split(':');
+  const toAdd = extra.filter(d => d && !dirs.includes(d));
+  if (toAdd.length > 0) {
+    process.env.PATH = toAdd.join(':') + ':' + current;
+    log(`PATH enriched with: ${toAdd.join(', ')}`);
+  }
+})();
 
 // ── Auto-updater ────────────────────────────────────────────────────────────
 let updaterInstance = null;
@@ -841,13 +895,15 @@ ipcMain.handle('close-usage-window', (event) => {
 });
 
 // Setup flow: check if Claude Code CLI is installed
+// Uses claude-path.js multi-strategy detection (env var → which → platform dirs)
+// so this works even when launched from Finder with a minimal PATH.
 ipcMain.handle('check-claude-installed', () => {
   try {
-    const { execFileSync } = require('child_process');
-    const claudePath = execFileSync('which', ['claude'], { encoding: 'utf8', timeout: 3000 }).trim();
+    const claudePath = getClaudeBinaryPath();
     let version = 'unknown';
     try {
-      version = execFileSync('claude', ['--version'], { encoding: 'utf8', timeout: 5000 }).trim();
+      const { execFileSync } = require('child_process');
+      version = execFileSync(claudePath, ['--version'], { encoding: 'utf8', timeout: 5000 }).trim();
     } catch { /* version check may fail */ }
     return { installed: true, path: claudePath, version };
   } catch {
