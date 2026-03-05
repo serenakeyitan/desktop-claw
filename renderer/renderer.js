@@ -278,6 +278,15 @@ function setupIPC() {
   // Listen for auth recovery (login retry detection cleared)
   window.electronAPI.onAuthRecovered(() => {
     document.getElementById('widget-container').classList.remove('auth-needed');
+    document.getElementById('widget-container').classList.remove('error-state');
+    // Clear any error text from the countdown — the next token-update will
+    // replace it with the real reset timer, but in the meantime show a
+    // reassuring message instead of the stale error.
+    const countdown = document.getElementById('countdown-text');
+    if (countdown) {
+      countdown.textContent = 'reconnected';
+      countdown.classList.remove('error');
+    }
   });
 
   // Listen for state changes

@@ -263,7 +263,10 @@ function hasAuth() {
 }
 
 // Create setup wizard window
-function createSetupWindow() {
+// opts.reauth: when true, the setup wizard skips the CLI-installed check
+// and jumps straight to credential verification (used when re-authenticating
+// from an already-running app whose token expired).
+function createSetupWindow(opts = {}) {
   setupWindow = new BrowserWindow({
     width: 600,
     height: 700,
@@ -281,7 +284,12 @@ function createSetupWindow() {
     backgroundColor: '#1a1a1a'
   });
 
-  setupWindow.loadFile(path.join(__dirname, 'renderer', 'setup.html'));
+  // Pass reauth flag as a query param so the renderer can skip the CLI check
+  const setupUrl = new URL('file://' + path.join(__dirname, 'renderer', 'setup.html'));
+  if (opts.reauth) {
+    setupUrl.searchParams.set('reauth', '1');
+  }
+  setupWindow.loadURL(setupUrl.href);
 
   setupWindow.on('closed', () => {
     setupWindow = null;
@@ -388,6 +396,19 @@ function createMainWindow() {
 
 }
 
+// Return a human-readable subscription label from the last known tier persisted
+// in config. Avoids showing "Claude Pro" to Max users during a disconnection.
+function _lastKnownSubscriptionLabel() {
+  try {
+    const cfg = loadConfig();
+    const tier = cfg.lastKnownTier;
+    if (tier === 'max_200') return 'Claude Max ($200)';
+    if (tier === 'max_100') return 'Claude Max';
+    if (tier) return 'Claude Pro';
+  } catch { /* ignore */ }
+  return 'Claude Pro';
+}
+
 // Check for manual usage file
 // Normalize usage blobs saved by scripts so the renderer always gets pct/reset_at
 function normalizeUsageData(data, defaultSource = 'manual-file') {
@@ -419,7 +440,7 @@ function normalizeUsageData(data, defaultSource = 'manual-file') {
     percentage: pct,
     reset_at: resetAt,
     resetAt,
-    subscription: data.subscription || 'Claude Pro',
+    subscription: data.subscription || _lastKnownSubscriptionLabel(),
     type: data.type || '5-hour',
     realData: data.realData !== undefined ? data.realData : true,
     source: data.source || defaultSource,
@@ -496,8 +517,10 @@ async function initializeServices() {
         }
 
         // Auto-open the setup window for re-authentication
+        // Pass reauth flag so the wizard skips the CLI-installed check
+        // (we know it's installed — the token just expired).
         if (!setupWindow) {
-          createSetupWindow();
+          createSetupWindow({ reauth: true });
         } else {
           setupWindow.focus();
         }
@@ -519,6 +542,17 @@ async function initializeServices() {
           mainWindow.webContents.send('token-update', normalized);
         }
 
+        // Persist the subscription tier so it survives disconnections.
+        // Without this, a token expiry would cause every tier lookup to
+        // fall back to 'pro', showing the wrong plan to non-Pro users.
+        if (data.subscriptionTier) {
+          const cfg = loadConfig();
+          if (cfg.lastKnownTier !== data.subscriptionTier) {
+            cfg.lastKnownTier = data.subscriptionTier;
+            saveConfig(cfg);
+          }
+        }
+
         // Sync subscription tier to Supabase profile
         if (socialSync && data.subscriptionTier) {
           socialSync.setSubscriptionTier(data.subscriptionTier);
@@ -535,7 +569,7 @@ async function initializeServices() {
         // even if the user later switches plans.
         if (usageDB && sessionMonitor) {
           const currentPct = data.percentage ?? data.pct ?? null;
-          const tier = data.subscriptionTier || 'pro';
+          const tier = data.subscriptionTier || loadConfig().lastKnownTier || 'pro';
           if (currentPct !== null && lastUsagePct !== null) {
             const delta = currentPct - lastUsagePct;
             if (delta > 0) {
@@ -971,6 +1005,26 @@ ipcMain.handle('complete-setup', async (event, authType) => {
 
   if (!mainWindow) {
     createMainWindow();
+  } else {
+    // Re-authentication flow: main window already exists.
+    // Reset the tracker's failure state and force a fresh credential check
+    // so the robot immediately picks up the new/refreshed credentials.
+    if (autoUsageUpdater && autoUsageUpdater.claudeTracker) {
+      const tracker = autoUsageUpdater.claudeTracker;
+      tracker.consecutiveAuthFailures = 0;
+      tracker.authNeededEmitted = false;
+      tracker.cachedToken = null;
+      tracker.cachedTokenExpiresAt = 0;
+
+      // Immediately fetch fresh usage and push to renderer
+      tracker.checkUsage().then((data) => {
+        if (data && mainWindow && !mainWindow.isDestroyed()) {
+          const normalized = normalizeUsageData(data, 'claude-status');
+          mainWindow.webContents.send('token-update', normalized);
+          mainWindow.webContents.send('auth-recovered');
+        }
+      }).catch(() => {});
+    }
   }
 
   // Trigger onboarding for first-time users
@@ -1293,9 +1347,12 @@ ipcMain.handle('social-global-ranking', async (event, period) => {
 
 // Return locally-detected subscription tier + active session info for social fallback
 ipcMain.handle('social-get-local-info', () => {
-  const info = { subscriptionTier: 'pro', activeSessions: [] };
+  // Start with the persisted tier from config (survives disconnections),
+  // then override with the more recent value from real-usage.json if available.
+  const cfg = loadConfig();
+  const info = { subscriptionTier: cfg.lastKnownTier || 'pro', activeSessions: [] };
 
-  // Read tier from saved usage data
+  // Read tier from saved usage data (may be more recent than config)
   try {
     const usageFile = require('path').join(require('os').homedir(), '.alldaypoke', 'real-usage.json');
     if (require('fs').existsSync(usageFile)) {
@@ -1379,7 +1436,8 @@ ipcMain.handle('show-context-menu', (event) => {
       label: '🔑 Claude Login',
       click: () => {
         if (!setupWindow) {
-          createSetupWindow();
+          // If the main window is already running, this is a re-auth
+          createSetupWindow(mainWindow ? { reauth: true } : {});
         } else {
           setupWindow.focus();
         }
@@ -1388,8 +1446,22 @@ ipcMain.handle('show-context-menu', (event) => {
     { type: 'separator' },
     {
       label: 'Reload',
-      click: () => {
-        if (mainWindow) mainWindow.reload();
+      click: async () => {
+        if (!mainWindow) return;
+
+        // Reset auth failure state in the tracker so it retries immediately
+        if (autoUsageUpdater && autoUsageUpdater.claudeTracker) {
+          autoUsageUpdater.claudeTracker.consecutiveAuthFailures = 0;
+          autoUsageUpdater.claudeTracker.authNeededEmitted = false;
+          autoUsageUpdater.claudeTracker.cachedToken = null;
+          autoUsageUpdater.claudeTracker.cachedTokenExpiresAt = 0;
+
+          // Trigger an immediate usage check with fresh credentials
+          autoUsageUpdater.claudeTracker.checkUsage().catch(() => {});
+        }
+
+        // Reload the renderer UI
+        mainWindow.reload();
       }
     },
     {

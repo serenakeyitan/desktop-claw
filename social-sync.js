@@ -86,7 +86,7 @@ class SocialSync extends EventEmitter {
       active_time_ms: e.activeTimeMs || 0,
       logged_at: e.timestamp,
       date: e.date,
-      tier: e.tier || 'pro',
+      tier: e.tier || this.subscriptionTier || 'pro',
     }));
 
     const { error } = await sb.from('usage_logs').insert(rows);

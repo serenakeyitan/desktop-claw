@@ -53,6 +53,7 @@ class UsageDB {
    * This covers app startup before the first live usage poll arrives.
    */
   _detectTierFromCache() {
+    // First try real-usage.json (most recent data from last API poll)
     try {
       const usageFile = path.join(os.homedir(), '.alldaypoke', 'real-usage.json');
       if (fs.existsSync(usageFile)) {
@@ -60,6 +61,16 @@ class UsageDB {
         if (cached.subscriptionTier) return cached.subscriptionTier;
       }
     } catch { /* ignore */ }
+
+    // Then try config.json (persisted across disconnections)
+    try {
+      const configFile = path.join(os.homedir(), '.alldaypoke', 'config.json');
+      if (fs.existsSync(configFile)) {
+        const cfg = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+        if (cfg.lastKnownTier) return cfg.lastKnownTier;
+      }
+    } catch { /* ignore */ }
+
     return FALLBACK_TIER;
   }
 

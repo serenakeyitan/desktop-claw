@@ -613,12 +613,18 @@ async function buildLocalSelfRanking(period) {
     }];
   } catch (err) {
     console.error('buildLocalSelfRanking failed:', err);
-    // Even on total failure, return a minimal self row
+    // Even on total failure, return a minimal self row.
+    // Try to read the persisted tier so we don't show 'PRO' to Max users.
+    let fallbackTier = 'pro';
+    try {
+      const li = await window.socialAPI.getLocalInfo().catch(() => null);
+      if (li?.subscriptionTier) fallbackTier = li.subscriptionTier;
+    } catch { /* ignore */ }
     return [{
       user_id: 'self',
       username: 'You',
       display_name: 'You',
-      subscription_tier: 'pro',
+      subscription_tier: fallbackTier,
       total_usage: 0,
       total_time_ms: 0,
       log_count: 0,

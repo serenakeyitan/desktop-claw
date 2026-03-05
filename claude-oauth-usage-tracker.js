@@ -177,10 +177,15 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
               reject(new Error(`Failed to parse usage response: ${e.message}`));
             }
           } else if (res.statusCode === 401) {
-            // Token might be stale - clear cache and retry on next poll
+            // Token is stale — clear cache so next getAccessToken() re-reads keychain
             this.cachedToken = null;
             this.cachedTokenExpiresAt = 0;
             reject(new Error(`Usage API returned 401 - token may be expired`));
+          } else if (res.statusCode === 403) {
+            // Credentials revoked or subscription changed
+            this.cachedToken = null;
+            this.cachedTokenExpiresAt = 0;
+            reject(new Error(`Usage API returned 403 - credentials may be revoked`));
           } else {
             reject(new Error(`Usage API failed: HTTP ${res.statusCode} - ${data}`));
           }
@@ -205,7 +210,19 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
     if (raw.includes('200') || raw.includes('max_200')) return 'max_200';
     if (raw.includes('max') || raw.includes('100')) return 'max_100';
     if (raw.includes('pro')) return 'pro';
-    // Default: if we got this far via OAuth, assume at least pro
+
+    // Keychain didn't have a recognisable tier — fall back to the last
+    // successfully detected tier persisted in config, so that a temporary
+    // disconnection doesn't reset a Max user's display to "Pro".
+    try {
+      const cfgPath = path.join(os.homedir(), '.alldaypoke', 'config.json');
+      if (fs.existsSync(cfgPath)) {
+        const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+        if (cfg.lastKnownTier) return cfg.lastKnownTier;
+      }
+    } catch { /* ignore */ }
+
+    // Ultimate fallback when nothing is persisted (first launch)
     return 'pro';
   }
 
@@ -308,11 +325,47 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
       return normalized;
     } catch (err) {
       log.error('Failed to check Claude usage:', err.message);
+
+      // On a 401/403, immediately retry once with a fresh token from keychain.
+      // This handles the common case where the cached token expired but the
+      // keychain still has a valid refresh token (e.g., user re-logged into
+      // Claude Code in the background).
+      const is401or403 = err.message.includes('401') || err.message.includes('403');
+      if (is401or403 && !this._retrying) {
+        this._retrying = true;
+        log('Got 401/403 — retrying once with fresh credentials...');
+        try {
+          const retryResult = await this.fetchUsage();
+          const normalized = this.normalizeUsageData(retryResult);
+          this.lastUsageData = normalized;
+          this.saveUsage(normalized);
+
+          // Retry succeeded — reset failure tracking
+          if (this.consecutiveAuthFailures > 0) {
+            log(`Auth recovered on retry after ${this.consecutiveAuthFailures} failures`);
+          }
+          this.consecutiveAuthFailures = 0;
+          if (this.authNeededEmitted) {
+            this.authNeededEmitted = false;
+            this.emit('auth-recovered');
+          }
+
+          this.emit('usage-updated', normalized);
+          return normalized;
+        } catch (retryErr) {
+          log.error('Retry also failed:', retryErr.message);
+          // Fall through to normal failure handling below
+        } finally {
+          this._retrying = false;
+        }
+      }
+
       this.emit('error', err);
 
       // Track auth-related failures (missing credentials, 401, refresh failure)
       const isAuthError = err.message.includes('credentials')
         || err.message.includes('401')
+        || err.message.includes('403')
         || err.message.includes('refresh token')
         || err.message.includes('Token refresh failed');
 

@@ -345,13 +345,26 @@
   <script>
     let setupPassed = false;
 
+    // Detect re-auth mode from query params
+    const isReauth = new URLSearchParams(window.location.search).has('reauth');
+
     // Run the setup checks automatically on load
     window.addEventListener('DOMContentLoaded', () => {
       setTimeout(runSetup, 400);
     });
 
     async function runSetup() {
-      await checkInstall();
+      if (isReauth) {
+        // Re-authentication: skip CLI check (we know it's installed)
+        // and jump straight to credential verification.
+        const step = document.getElementById('step-install');
+        step.className = 'step pass';
+        document.getElementById('step-install-body').innerHTML =
+          'Claude Code installed <span style="color: #888;">(skipped — re-authenticating)</span>';
+        await checkCredentials();
+      } else {
+        await checkInstall();
+      }
     }
 
     // ── Step 1: Claude Code CLI ──
@@ -373,6 +386,7 @@
         body.innerHTML =
           'Claude Code is not installed yet.' +
           '<div class="help-text">All Day Poke reads usage data from Claude Code. Install it first:</div>' +
+          '<div class="help-text">Open the Claude Desktop app &rarr; Settings &rarr; "Install command line tool", or run:</div>' +
           '<div class="code-block">npm install -g @anthropic-ai/claude-code</div>' +
           '<div class="help-text">Then sign in to your Anthropic account:</div>' +
           '<div class="code-block">claude login</div>' +
