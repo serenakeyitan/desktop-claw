@@ -82,20 +82,25 @@ class StatsDisplay {
     this.tokenPercentage.textContent = '-- %';
     this.tokenFill.style.width = '0%';
 
-    if (errorMessage.toLowerCase().includes('no api key')) {
-      this.countdownText.textContent = 'no api key';
+    const msg = errorMessage.toLowerCase();
+
+    if (msg.includes('no api key') || msg.includes('no authentication')) {
+      this.countdownText.textContent = 'not connected';
       this.countdownText.classList.add('error');
-    } else if (errorMessage.toLowerCase().includes('auth')) {
-      this.countdownText.textContent = 'auth error';
+    } else if (msg.includes('auth-needed') || msg.includes('login')) {
+      this.countdownText.textContent = 'login needed';
       this.countdownText.classList.add('error');
-    } else if (errorMessage.toLowerCase().includes('rate limit')) {
+    } else if (msg.includes('auth') || msg.includes('credential') || msg.includes('token')) {
+      this.countdownText.textContent = 'reconnecting...';
+      this.countdownText.classList.add('error');
+    } else if (msg.includes('rate limit') || msg.includes('429')) {
       this.countdownText.textContent = 'rate limited';
       this.countdownText.classList.add('error');
-    } else if (errorMessage.toLowerCase().includes('offline')) {
-      this.countdownText.textContent = '(offline)';
+    } else if (msg.includes('offline') || msg.includes('network') || msg.includes('fetch')) {
+      this.countdownText.textContent = 'offline';
       this.countdownText.classList.add('error');
     } else {
-      this.countdownText.textContent = 'error';
+      this.countdownText.textContent = 'syncing...';
       this.countdownText.classList.add('error');
     }
   }

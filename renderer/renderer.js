@@ -431,23 +431,13 @@ function setupUpdateListener() {
 
 const ONBOARDING_STEPS = [
   {
-    label: 'Welcome',
-    text: 'Meet your robot! It lives on your desktop and tracks your Claude Code usage.',
+    label: 'Your Robot',
+    text: 'This is your usage buddy. Hover to see live stats, drag to move, right-click for the menu.',
     position: 'above',
   },
   {
-    label: 'Hover',
-    text: 'Hover over the robot to see live stats — usage %, reset timer, and active sessions.',
-    position: 'above',
-  },
-  {
-    label: 'Resize',
-    text: 'Drag the tiny handle at the bottom-right corner of the robot to resize it.',
-    position: 'above',
-  },
-  {
-    label: 'Right-click',
-    text: 'Right-click for the menu — Usage Ranking, Social Ranking, settings, and more.',
+    label: 'Social',
+    text: 'Right-click and open Social Ranking to compete with friends and see who vibes the hardest.',
     position: 'above',
   },
 ];
@@ -492,8 +482,9 @@ function showOnboardingStep() {
     <div id="onboarding-text">${step.text}</div>
     <div id="onboarding-actions">
       <div id="onboarding-dots">${dots}</div>
-      <button id="onboarding-next">${isLast ? 'Done' : 'Next'}</button>
+      <button id="onboarding-next">${isLast ? 'Got it' : 'Next'}</button>
     </div>
+    <div id="onboarding-skip">skip</div>
     <div id="onboarding-tail"></div>
   `;
 
@@ -507,6 +498,16 @@ function showOnboardingStep() {
     e.stopPropagation();
     onboardingStep++;
     showOnboardingStep();
+  });
+
+  tooltip.querySelector('#onboarding-skip').addEventListener('click', (e) => {
+    e.stopPropagation();
+    // Skip straight to done
+    if (onboardingEl) {
+      onboardingEl.remove();
+      onboardingEl = null;
+    }
+    window.electronAPI.onboardingDone();
   });
 }
 

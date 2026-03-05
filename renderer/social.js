@@ -106,7 +106,7 @@ async function loadFriendRanking() {
       const fallback = await buildLocalSelfRanking(currentPeriod);
       renderRanking(fallback);
     } catch {
-      tableBody.innerHTML = '<div class="empty-state">Failed to load ranking</div>';
+      tableBody.innerHTML = '<div class="empty-state-rich"><div class="empty-icon">~</div><div class="empty-title">Could not load rankings</div><div class="empty-hint">Check your connection and try again in a moment.</div></div>';
     }
   }
 }
@@ -132,7 +132,7 @@ async function loadGlobalRanking() {
       const fallback = await buildLocalSelfRanking(currentPeriod);
       renderRanking(fallback);
     } catch {
-      tableBody.innerHTML = '<div class="empty-state">Failed to load ranking</div>';
+      tableBody.innerHTML = '<div class="empty-state-rich"><div class="empty-icon">~</div><div class="empty-title">Could not load rankings</div><div class="empty-hint">Check your connection and try again in a moment.</div></div>';
     }
   }
 }
@@ -159,7 +159,7 @@ async function loadFriendStatus() {
       const fallback = await buildLocalSelfRanking('all');
       renderStatusList(fallback);
     } catch {
-      statusList.innerHTML = '<div class="empty-state">Failed to load status</div>';
+      statusList.innerHTML = '<div class="empty-state-rich"><div class="empty-icon">~</div><div class="empty-title">Could not load status</div><div class="empty-hint">Check your connection and try again in a moment.</div></div>';
     }
   }
 }
@@ -175,7 +175,19 @@ function renderRanking(data) {
   rankBanner.innerHTML = '';
 
   if (!data || data.length === 0) {
-    tableBody.innerHTML = '<div class="empty-state">No data yet. Add friends and start coding!</div>';
+    const isGlobal = currentTab === 'global';
+    const emptyMsg = isGlobal
+      ? '<div class="empty-state-rich">' +
+        '<div class="empty-icon">~</div>' +
+        '<div class="empty-title">No rankings yet</div>' +
+        '<div class="empty-hint">Start a Claude Code session and your usage will appear here.</div>' +
+        '</div>'
+      : '<div class="empty-state-rich">' +
+        '<div class="empty-icon">~</div>' +
+        '<div class="empty-title">No friends yet</div>' +
+        '<div class="empty-hint">Share your invite code to add friends and compete on usage.</div>' +
+        '</div>';
+    tableBody.innerHTML = emptyMsg;
     return;
   }
 
@@ -337,7 +349,12 @@ function renderStatusList(data) {
   const statusList = document.getElementById('status-list');
 
   if (!data || data.length === 0) {
-    statusList.innerHTML = '<div class="empty-state">No friends yet. Share your invite code!</div>';
+    statusList.innerHTML =
+      '<div class="empty-state-rich">' +
+      '<div class="empty-icon">~</div>' +
+      '<div class="empty-title">No friends yet</div>' +
+      '<div class="empty-hint">Click "Invite" above to get your invite link, then share it with friends.</div>' +
+      '</div>';
     return;
   }
 

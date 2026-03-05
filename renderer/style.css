@@ -548,6 +548,19 @@ body.dragging #widget-container {
   background: #d9936f;
 }
 
+#onboarding-skip {
+  text-align: center;
+  color: #555;
+  font-size: 8px;
+  margin-top: 6px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+}
+
+#onboarding-skip:hover {
+  color: #888;
+}
+
 /* ── Update Notification Popup ── */
 #update-popup {
   position: absolute;

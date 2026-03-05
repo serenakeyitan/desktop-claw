@@ -26,30 +26,62 @@
       gap: 16px;
     }
 
+    /* ── Hero section ── */
+    .hero {
+      text-align: center;
+      padding: 8px 0 4px;
+    }
+
+    .hero-robot {
+      font-size: 36px;
+      margin-bottom: 6px;
+      animation: hero-float 3s ease-in-out infinite;
+    }
+
+    @keyframes hero-float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+
     h1 {
-      font-size: 20px;
+      font-size: 18px;
       color: #cd7f5d;
       margin-bottom: 4px;
+      letter-spacing: 2px;
+    }
+
+    .tagline {
+      color: #888;
+      font-size: 11px;
+      line-height: 1.5;
+      max-width: 360px;
+      margin: 0 auto;
+    }
+
+    /* ── Feature pills ── */
+    .features {
       display: flex;
-      align-items: center;
-      gap: 10px;
+      gap: 6px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 8px;
     }
 
-    .robot-icon {
-      width: 24px;
-      height: 24px;
-      display: inline-block;
-      background: #cd7f5d;
-      mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="10" y="2" width="4" height="2"/><rect x="6" y="4" width="12" height="8"/><rect x="8" y="6" width="2" height="2" fill="white"/><rect x="14" y="6" width="2" height="2" fill="white"/><rect x="4" y="12" width="16" height="10"/><rect x="6" y="14" width="2" height="2"/></svg>') center/contain no-repeat;
+    .feature-pill {
+      background: #2a2a2a;
+      border: 1px solid #333;
+      color: #aaa;
+      font-size: 9px;
+      padding: 3px 8px;
+      letter-spacing: 0.5px;
     }
 
-    .description { color: #888; line-height: 1.5; }
-
+    /* ── Steps ── */
     .steps-container {
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
       overflow-y: auto;
       padding-bottom: 12px;
     }
@@ -111,6 +143,13 @@
     .step-body .success-detail { color: #39ff14; margin-top: 4px; }
     .step-body .error-detail { color: #ff3333; margin-top: 4px; }
 
+    .step-body .help-text {
+      color: #777;
+      margin-top: 6px;
+      font-size: 10px;
+      line-height: 1.5;
+    }
+
     .code-block {
       background: #0a0a0a;
       padding: 8px 10px;
@@ -135,6 +174,36 @@
 
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ── All-clear banner ── */
+    .all-clear {
+      display: none;
+      background: #152a15;
+      border: 1px solid #205a20;
+      padding: 10px 14px;
+      text-align: center;
+      animation: fade-in 0.3s ease;
+    }
+
+    .all-clear.visible { display: block; }
+
+    .all-clear-text {
+      color: #39ff14;
+      font-size: 11px;
+      font-weight: bold;
+    }
+
+    .all-clear-sub {
+      color: #2a8a2a;
+      font-size: 9px;
+      margin-top: 3px;
+    }
+
+    @keyframes fade-in {
+      0% { opacity: 0; transform: translateY(4px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Buttons ── */
     .buttons {
       display: flex;
       gap: 10px;
@@ -199,13 +268,31 @@
 </head>
 <body>
   <div class="setup-container">
-    <h1>
-      <span class="robot-icon"></span>
-      All Day Poke Setup
-    </h1>
-
-    <div class="description">
-      Track your Claude subscription usage with a desktop pet. Requires Claude Code CLI.
+    <!-- Hero: show what this is before any checks -->
+    <div class="hero">
+      <div class="hero-robot">
+        <svg width="48" height="48" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" style="image-rendering: pixelated;">
+          <rect x="7" y="0" width="2" height="2" fill="#cd7f5d"/>
+          <rect x="4" y="2" width="8" height="5" fill="#cd7f5d"/>
+          <rect x="5" y="3" width="2" height="2" fill="#fff"/>
+          <rect x="9" y="3" width="2" height="2" fill="#fff"/>
+          <rect x="3" y="7" width="10" height="7" fill="#cd7f5d"/>
+          <rect x="2" y="8" width="1" height="3" fill="#cd7f5d"/>
+          <rect x="13" y="8" width="1" height="3" fill="#cd7f5d"/>
+          <rect x="5" y="14" width="2" height="2" fill="#cd7f5d"/>
+          <rect x="9" y="14" width="2" height="2" fill="#cd7f5d"/>
+        </svg>
+      </div>
+      <h1>ALL DAY POKE</h1>
+      <div class="tagline">
+        A tiny desktop robot that watches your Claude usage so you don't have to.
+      </div>
+      <div class="features">
+        <span class="feature-pill">live usage %</span>
+        <span class="feature-pill">reset countdown</span>
+        <span class="feature-pill">session tracking</span>
+        <span class="feature-pill">friend rankings</span>
+      </div>
     </div>
 
     <div class="steps-container">
@@ -216,7 +303,7 @@
           <div class="step-title">Claude Code CLI</div>
         </div>
         <div class="step-body" id="step-install-body">
-          Checking if Claude Code is installed...
+          Looking for Claude Code on your system...
         </div>
       </div>
 
@@ -224,7 +311,7 @@
       <div class="step pending" id="step-creds">
         <div class="step-header">
           <div class="step-icon">2</div>
-          <div class="step-title">Account Credentials</div>
+          <div class="step-title">Subscription</div>
         </div>
         <div class="step-body" id="step-creds-body">
           Waiting...
@@ -235,7 +322,7 @@
       <div class="step pending" id="step-api">
         <div class="step-header">
           <div class="step-icon">3</div>
-          <div class="step-title">API Connection <span style="color: #666; font-weight: normal; font-size: 10px;">(optional)</span></div>
+          <div class="step-title">Usage Data <span style="color: #666; font-weight: normal; font-size: 10px;">(optional)</span></div>
         </div>
         <div class="step-body" id="step-api-body">
           Waiting...
@@ -243,9 +330,15 @@
       </div>
     </div>
 
+    <!-- All-clear banner (shown when all checks pass) -->
+    <div class="all-clear" id="all-clear">
+      <div class="all-clear-text">All set! Your robot is ready.</div>
+      <div class="all-clear-sub">It will live on your desktop and update automatically.</div>
+    </div>
+
     <div class="buttons">
-      <button class="secondary" onclick="skipSetup()">Skip (demo mode)</button>
-      <button id="launch-btn" onclick="launchApp()" disabled>Launch All Day Poke</button>
+      <button class="secondary" onclick="skipSetup()">Skip for now</button>
+      <button id="launch-btn" onclick="launchApp()" disabled>Launch</button>
     </div>
   </div>
 
@@ -258,7 +351,6 @@
     });
 
     async function runSetup() {
-      // Step 1: Check Claude Code installed
       await checkInstall();
     }
 
@@ -268,35 +360,33 @@
       const body = document.getElementById('step-install-body');
 
       step.className = 'step active';
-      body.innerHTML = '<span class="spinner"></span> Checking for Claude Code CLI...';
+      body.innerHTML = '<span class="spinner"></span> Looking for Claude Code on your system...';
 
       const result = await window.electronAPI.checkClaudeInstalled();
 
       if (result.installed) {
         step.className = 'step pass';
-        body.innerHTML = `Installed at <code>${result.path}</code>` +
-          `<div class="success-detail">Version: ${result.version}</div>`;
-        // Proceed to step 2
+        body.innerHTML = `Found Claude Code <span style="color: #39ff14;">${result.version || ''}</span>`;
         await checkCredentials();
       } else {
         step.className = 'step fail';
         body.innerHTML =
-          'Claude Code CLI is not installed.' +
-          '<div class="detail" style="margin-top: 8px;">Install it with:</div>' +
+          'Claude Code is not installed yet.' +
+          '<div class="help-text">All Day Poke reads usage data from Claude Code. Install it first:</div>' +
           '<div class="code-block">npm install -g @anthropic-ai/claude-code</div>' +
-          '<div class="detail">Then log in:</div>' +
+          '<div class="help-text">Then sign in to your Anthropic account:</div>' +
           '<div class="code-block">claude login</div>' +
-          '<button class="retry-btn" onclick="runSetup()">Retry Detection</button>';
+          '<button class="retry-btn" onclick="runSetup()">Check again</button>';
       }
     }
 
-    // ── Step 2: Account Credentials ──
+    // ── Step 2: Subscription ──
     async function checkCredentials() {
       const step = document.getElementById('step-creds');
       const body = document.getElementById('step-creds-body');
 
       step.className = 'step active';
-      body.innerHTML = '<span class="spinner"></span> Checking for Claude account credentials in Keychain...';
+      body.innerHTML = '<span class="spinner"></span> Looking for your Claude subscription...';
 
       const result = await window.electronAPI.checkClaudeCredentials();
 
@@ -305,29 +395,27 @@
                          result.subscriptionType === 'pro' ? 'Claude Pro' :
                          result.subscriptionType.charAt(0).toUpperCase() + result.subscriptionType.slice(1);
         step.className = 'step pass';
-        body.innerHTML =
-          `Found <strong>${planName}</strong> subscription credentials.` +
-          `<div class="success-detail">OAuth refresh token: available</div>`;
-        // Proceed to step 3
+        body.innerHTML = `<strong>${planName}</strong> subscription detected`;
         await testConnection();
       } else {
         step.className = 'step fail';
         body.innerHTML =
-          'No Claude credentials found in the macOS Keychain.' +
-          '<div class="detail" style="margin-top: 8px;">Log in to Claude Code first:</div>' +
+          'No Claude subscription found.' +
+          '<div class="help-text">All Day Poke reads your subscription from the macOS Keychain. ' +
+          'Sign in to Claude Code first:</div>' +
           '<div class="code-block">claude login</div>' +
-          '<div class="detail">This stores your OAuth credentials securely in the macOS Keychain.</div>' +
-          '<button class="retry-btn" onclick="retryFromStep2()">Retry</button>';
+          '<div class="help-text">This is a one-time setup. Your credentials stay in the secure Keychain.</div>' +
+          '<button class="retry-btn" onclick="retryFromStep2()">Check again</button>';
       }
     }
 
-    // ── Step 3: Test API (optional — credentials are sufficient) ──
+    // ── Step 3: Usage Data (optional) ──
     async function testConnection() {
       const step = document.getElementById('step-api');
       const body = document.getElementById('step-api-body');
 
       step.className = 'step active';
-      body.innerHTML = '<span class="spinner"></span> Testing connection to Claude API...';
+      body.innerHTML = '<span class="spinner"></span> Fetching your current usage...';
 
       const result = await window.electronAPI.testClaudeConnection();
 
@@ -336,10 +424,10 @@
 
         let usageHtml = '<div class="usage-preview">';
         if (result.usage.fiveHour !== null) {
-          usageHtml += `<div class="usage-row"><span class="usage-label">5-hour usage:</span><span class="usage-value">${Math.round(result.usage.fiveHour)}%</span></div>`;
+          usageHtml += `<div class="usage-row"><span class="usage-label">5-hour window:</span><span class="usage-value">${Math.round(result.usage.fiveHour)}% used</span></div>`;
         }
         if (result.usage.sevenDay !== null) {
-          usageHtml += `<div class="usage-row"><span class="usage-label">7-day usage:</span><span class="usage-value">${Math.round(result.usage.sevenDay)}%</span></div>`;
+          usageHtml += `<div class="usage-row"><span class="usage-label">7-day window:</span><span class="usage-value">${Math.round(result.usage.sevenDay)}% used</span></div>`;
         }
         if (result.usage.resetAt) {
           const resetDate = new Date(result.usage.resetAt);
@@ -351,26 +439,28 @@
         }
         usageHtml += '</div>';
 
-        body.innerHTML = 'Connected successfully! Live usage data:' + usageHtml;
+        body.innerHTML = 'Live usage data:' + usageHtml;
 
-        // Enable launch button
         setupPassed = true;
         document.getElementById('launch-btn').disabled = false;
+        showAllClear();
       } else {
-        // API test failed — but credentials were found, so let the user proceed anyway.
-        // This handles rate limits (429), temporary outages, etc.
+        // API test failed but credentials exist -- still allow launch
         step.className = 'step fail';
         body.innerHTML =
-          'Could not verify API connection right now.' +
+          'Could not fetch usage data right now.' +
           `<div class="error-detail">${result.error}</div>` +
-          '<div class="detail" style="margin-top: 8px;">This is often temporary (rate limits, network issues). ' +
-          'Your credentials are valid — you can launch now and usage will sync automatically.</div>' +
-          '<button class="retry-btn" onclick="retryFromStep3()">Retry</button>';
+          '<div class="help-text">This is usually temporary (rate limits, network). ' +
+          'Your subscription is valid -- usage will sync once you launch.</div>' +
+          '<button class="retry-btn" onclick="retryFromStep3()">Try again</button>';
 
-        // Still allow launch — credentials are enough
         setupPassed = true;
         document.getElementById('launch-btn').disabled = false;
       }
+    }
+
+    function showAllClear() {
+      document.getElementById('all-clear').classList.add('visible');
     }
 
     // ── Retry helpers ──
@@ -379,12 +469,14 @@
       document.getElementById('step-creds-body').textContent = 'Waiting...';
       document.getElementById('step-api').className = 'step pending';
       document.getElementById('step-api-body').textContent = 'Waiting...';
+      document.getElementById('all-clear').classList.remove('visible');
       await checkCredentials();
     }
 
     async function retryFromStep3() {
       document.getElementById('step-api').className = 'step pending';
       document.getElementById('step-api-body').textContent = 'Waiting...';
+      document.getElementById('all-clear').classList.remove('visible');
       await testConnection();
     }
 
@@ -399,9 +491,7 @@
 
     // ── Skip ──
     function skipSetup() {
-      if (confirm('All Day Poke will run in demo mode without real usage data. Continue?')) {
-        window.electronAPI.completeSetup('demo');
-      }
+      window.electronAPI.completeSetup('demo');
     }
   </script>
 </body>
