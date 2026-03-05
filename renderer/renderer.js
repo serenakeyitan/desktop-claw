@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initializeStats();
   setupEventListeners();
   setupIPC();
+  setupUpdateListener();
   setupOnboarding();
 });
 
@@ -31,6 +32,15 @@ async function initializeRobot() {
   } catch (e) {
     applyRobotScale(0.6);
   }
+
+  // Force a repaint shortly after creation — workaround for macOS
+  // transparent window sometimes not rendering SVG content on first paint.
+  requestAnimationFrame(() => {
+    container.style.opacity = '0.99';
+    requestAnimationFrame(() => {
+      container.style.opacity = '1';
+    });
+  });
 
   // Set up blinking interval for idle state
   setInterval(() => {
@@ -105,11 +115,19 @@ function setupClickThrough() {
     return el && onboardingEl.contains(el);
   }
 
+  function isOverUpdatePopup(e) {
+    const popup = document.getElementById('update-popup');
+    if (!popup || popup.classList.contains('hidden')) return false;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    return el && popup.contains(el);
+  }
+
   document.addEventListener('mousemove', (e) => {
     const overRobot = isOverRobot(e);
     const overBubble = isOverBubble(e);
     const overOnboarding = isOverOnboarding(e);
-    const overContent = overRobot || overBubble || overOnboarding;
+    const overUpdatePopup = isOverUpdatePopup(e);
+    const overContent = overRobot || overBubble || overOnboarding || overUpdatePopup;
 
     // Toggle bubble visibility: show only when hovering robot or bubble itself
     if (bubble) {
@@ -250,6 +268,16 @@ function setupIPC() {
     } else {
       document.getElementById('widget-container').classList.remove('error-state');
     }
+
+    // Show auth-needed indicator (login retry detection)
+    if (data.authNeeded) {
+      document.getElementById('widget-container').classList.add('auth-needed');
+    }
+  });
+
+  // Listen for auth recovery (login retry detection cleared)
+  window.electronAPI.onAuthRecovered(() => {
+    document.getElementById('widget-container').classList.remove('auth-needed');
   });
 
   // Listen for state changes
@@ -296,7 +324,10 @@ function setupIPC() {
 
       // Busy sessions highlighted, idle sessions dimmed
       const items = shown.map(s => {
-        const name = s.project || 'unknown';
+        // Use project name, or derive from cwd, or fall back to 'session'
+        const name = s.project
+          || (s.cwd ? s.cwd.split('/').filter(Boolean).pop() : null)
+          || 'session';
         const cls = s.busy ? 'session-active' : 'session-idle';
         return `<span class="${cls}">${name}</span>`;
       });
@@ -318,6 +349,81 @@ function setupIPC() {
         robot.setState('idle');
       }
     }
+  });
+}
+
+// ── Update popup ────────────────────────────────────────────────────────
+
+let updatePopupDismissed = false;  // Track if user dismissed the popup this session
+
+function setupUpdateListener() {
+  const popup = document.getElementById('update-popup');
+  const message = document.getElementById('update-message');
+  const version = document.getElementById('update-version');
+  const progressBar = document.getElementById('update-progress-bar');
+  const progressFill = document.getElementById('update-progress-fill');
+  const updateBtn = document.getElementById('update-btn');
+  const dismissBtn = document.getElementById('update-dismiss');
+
+  window.electronAPI.onUpdateStatus((data) => {
+    switch (data.status) {
+      case 'available':
+        if (!updatePopupDismissed) {
+          message.textContent = 'New version available!';
+          version.textContent = `v${data.version}`;
+          progressBar.classList.add('hidden');
+          updateBtn.textContent = 'Update';
+          updateBtn.className = '';
+          dismissBtn.style.display = '';
+          popup.classList.remove('hidden');
+        }
+        break;
+
+      case 'downloading':
+        message.textContent = 'Downloading update...';
+        progressBar.classList.remove('hidden');
+        progressFill.style.width = `${data.progress}%`;
+        updateBtn.textContent = `${data.progress}%`;
+        updateBtn.disabled = true;
+        dismissBtn.style.display = 'none';
+        popup.classList.remove('hidden');
+        break;
+
+      case 'downloaded':
+        message.textContent = 'Update ready!';
+        progressBar.classList.add('hidden');
+        updateBtn.textContent = 'Restart';
+        updateBtn.className = 'restart';
+        updateBtn.disabled = false;
+        dismissBtn.style.display = 'none';
+        popup.classList.remove('hidden');
+        break;
+
+      case 'not-available':
+      case 'error':
+      case 'idle':
+        // Hide popup unless it's already hidden
+        if (!popup.classList.contains('hidden')) {
+          popup.classList.add('hidden');
+        }
+        break;
+    }
+  });
+
+  updateBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const status = updateBtn.textContent;
+    if (status === 'Restart') {
+      window.electronAPI.installUpdate();
+    } else if (status === 'Update') {
+      window.electronAPI.downloadUpdate();
+    }
+  });
+
+  dismissBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    updatePopupDismissed = true;
+    popup.classList.add('hidden');
   });
 }
 

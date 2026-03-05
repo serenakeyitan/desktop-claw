@@ -66,8 +66,12 @@ create table if not exists public.usage_logs (
   delta_percent real not null,
   active_time_ms integer default 0,
   logged_at timestamptz not null,
-  date date not null
+  date date not null,
+  tier text  -- subscription tier at time of recording ('pro', 'max_100', 'max_200')
 );
+
+-- Migration: add tier column if the table already exists
+alter table public.usage_logs add column if not exists tier text;
 
 alter table public.usage_logs enable row level security;
 
@@ -202,7 +206,29 @@ begin
 end;
 $$ language plpgsql security definer;
 
+-- ── Helper: convert (delta_percent, tier) → estimated tokens ──────────────
+-- Token budgets per 5-hour window must match the client-side constants in
+-- usage-db.js and social.js so local and server rankings agree.
+-- For legacy rows without a tier, falls back to the user's current profile tier.
+create or replace function _tokens_for_row(dp real, row_tier text, profile_tier text)
+returns bigint as $$
+declare
+  effective_tier text := coalesce(row_tier, profile_tier, 'pro');
+  tokens_per_window bigint;
+begin
+  case effective_tier
+    when 'max_200' then tokens_per_window := 90000000;   -- 90M
+    when 'max_100' then tokens_per_window := 45000000;   -- 45M
+    else                tokens_per_window :=  5000000;   --  5M (pro / default)
+  end case;
+  return round((dp::numeric / 100.0) * tokens_per_window);
+end;
+$$ language plpgsql immutable;
+
 -- 7. Function to get friend rankings for a period
+-- Returns total_tokens computed per-row using each row's stored tier (accurate
+-- even when a user switches plans mid-period). Falls back to the user's current
+-- profiles.subscription_tier for legacy rows without a tier.
 -- client_today: the client's local date as YYYY-MM-DD (avoids UTC timezone mismatch)
 create or replace function get_friend_ranking(period text default 'all', client_today date default null)
 returns json as $$
@@ -229,6 +255,7 @@ begin
         p.twitter_username,
         p.github_username,
         coalesce(sum(ul.delta_percent), 0) as total_usage,
+        coalesce(sum(_tokens_for_row(ul.delta_percent, ul.tier, p.subscription_tier)), 0) as total_tokens,
         coalesce(sum(ul.active_time_ms), 0) as total_time_ms,
         count(ul.id) as log_count,
         us.is_vibing,
@@ -244,15 +271,16 @@ begin
            select friend_id from public.friendships where user_id = current_user_id
          )
       group by p.id, p.username, p.display_name, p.subscription_tier, p.twitter_username, p.github_username, us.is_vibing, us.current_project, us.last_active_at
-      order by coalesce(sum(ul.delta_percent), 0) desc
+      order by coalesce(sum(_tokens_for_row(ul.delta_percent, ul.tier, p.subscription_tier)), 0) desc
     ) r
   );
 end;
 $$ language plpgsql security definer;
 
 -- 8. Function to get global ranking
+-- Same per-row token conversion as get_friend_ranking.
 -- client_today: the client's local date as YYYY-MM-DD (avoids UTC timezone mismatch)
-create or replace function get_global_ranking(period text default 'all', lim integer default 50, client_today date default null)
+create or replace function get_global_ranking(period text default 'all', lim integer default 200, client_today date default null)
 returns json as $$
 declare
   cutoff date;
@@ -269,12 +297,14 @@ begin
     select json_agg(row_to_json(r))
     from (
       select
+        p.id as user_id,
         p.username,
         p.display_name,
         p.subscription_tier,
         p.twitter_username,
         p.github_username,
         coalesce(sum(ul.delta_percent), 0) as total_usage,
+        coalesce(sum(_tokens_for_row(ul.delta_percent, ul.tier, p.subscription_tier)), 0) as total_tokens,
         coalesce(sum(ul.active_time_ms), 0) as total_time_ms,
         count(ul.id) as log_count,
         us.is_vibing,
@@ -285,7 +315,7 @@ begin
       left join public.user_status us
         on us.user_id = p.id
       group by p.id, p.username, p.display_name, p.subscription_tier, p.twitter_username, p.github_username, us.is_vibing, us.last_active_at
-      order by coalesce(sum(ul.delta_percent), 0) desc
+      order by coalesce(sum(_tokens_for_row(ul.delta_percent, ul.tier, p.subscription_tier)), 0) desc
       limit lim
     ) r
   );

@@ -146,6 +146,9 @@ body {
   border: 1px solid #282828;
   border-top: none;
   min-height: 160px;
+  max-height: calc(100vh - 280px);
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* ── Column widths ── */
@@ -288,6 +291,9 @@ body {
 #status-section {
   flex: 1;
   min-height: 160px;
+  max-height: calc(100vh - 240px);
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .status-card {
@@ -591,6 +597,65 @@ body {
   color: #f0f0f0;
 }
 
+/* ── "You are ranked #X" banner ── */
+#your-rank-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: #151515;
+  border: 1px solid #282828;
+  border-top: none;
+  color: #888;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+}
+
+#your-rank-banner .rank-number {
+  color: #cd7f5d;
+  font-weight: bold;
+  font-size: 11px;
+}
+
+#your-rank-banner .rank-label {
+  color: #666;
+}
+
+#your-rank-banner .scroll-to-me {
+  background: none;
+  border: 1px solid #333;
+  color: #888;
+  font-family: inherit;
+  font-size: 8px;
+  padding: 2px 8px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  margin-left: 6px;
+}
+
+#your-rank-banner .scroll-to-me:hover {
+  border-color: #cd7f5d;
+  color: #cd7f5d;
+}
+
+/* Highlight the current user's row */
+.ranking-row.self-row {
+  background: rgba(205, 127, 93, 0.06);
+  border-left: 2px solid #cd7f5d;
+}
+
+.ranking-row.self-row:hover {
+  background: rgba(205, 127, 93, 0.1);
+}
+
+.ranking-row.self-row .display-name::after {
+  content: ' (you)';
+  color: #cd7f5d;
+  font-size: 8px;
+  font-weight: normal;
+}
+
 /* ── Loading / empty ── */
 #loading, .empty-state {
   display: flex;
@@ -656,6 +721,29 @@ body {
 }
 
 /* col-poke defined above in Column widths */
+
+/* ── Context Menu ── */
+#context-menu {
+  position: fixed;
+  z-index: 200;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  min-width: 120px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.context-item {
+  padding: 7px 14px;
+  font-size: 10px;
+  color: #ccc;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+}
+
+.context-item:hover {
+  background: #2a1510;
+  color: #ff6b6b;
+}
 
 /* ── Pulse animation for vibing ── */
 @keyframes pulse-vibe {

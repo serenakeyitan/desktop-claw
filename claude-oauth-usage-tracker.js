@@ -21,6 +21,10 @@ const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage';
 const BETA_HEADER = 'oauth-2025-04-20';
 const KEYCHAIN_SERVICE = 'Claude Code-credentials';
 
+// Number of consecutive auth failures before emitting 'auth-needed'.
+// With ~60s polling, 3 failures ≈ 3 minutes of sustained auth problems.
+const AUTH_FAIL_THRESHOLD = 3;
+
 class ClaudeOAuthUsageTracker extends EventEmitter {
   constructor(options = {}) {
     super();
@@ -30,6 +34,9 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
     this.cachedTokenExpiresAt = 0;
     this.lastUsageData = null;
     this.usageFile = path.join(os.homedir(), '.alldaypoke', 'real-usage.json');
+    // Auth failure tracking for login-retry detection
+    this.consecutiveAuthFailures = 0;
+    this.authNeededEmitted = false; // only emit once until credentials return
   }
 
   /**
@@ -271,6 +278,8 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
 
   /**
    * Check usage once: fetch, normalize, save, and emit.
+   * Tracks consecutive auth failures and emits 'auth-needed' when Claude Code
+   * credentials are missing or invalid for AUTH_FAIL_THRESHOLD consecutive polls.
    */
   async checkUsage() {
     try {
@@ -278,6 +287,16 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
       const normalized = this.normalizeUsageData(rawData);
       this.lastUsageData = normalized;
       this.saveUsage(normalized);
+
+      // Success — reset auth failure tracking
+      if (this.consecutiveAuthFailures > 0) {
+        log(`Auth recovered after ${this.consecutiveAuthFailures} failures`);
+      }
+      this.consecutiveAuthFailures = 0;
+      if (this.authNeededEmitted) {
+        this.authNeededEmitted = false;
+        this.emit('auth-recovered');
+      }
 
       log(
         `Claude usage updated: 5h=${normalized.details.five_hour?.utilization ?? 'N/A'}%` +
@@ -290,6 +309,27 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
     } catch (err) {
       log.error('Failed to check Claude usage:', err.message);
       this.emit('error', err);
+
+      // Track auth-related failures (missing credentials, 401, refresh failure)
+      const isAuthError = err.message.includes('credentials')
+        || err.message.includes('401')
+        || err.message.includes('refresh token')
+        || err.message.includes('Token refresh failed');
+
+      if (isAuthError) {
+        this.consecutiveAuthFailures++;
+        log(`Auth failure ${this.consecutiveAuthFailures}/${AUTH_FAIL_THRESHOLD}: ${err.message}`);
+
+        if (this.consecutiveAuthFailures >= AUTH_FAIL_THRESHOLD && !this.authNeededEmitted) {
+          this.authNeededEmitted = true;
+          log('Auth needed — emitting auth-needed event');
+          this.emit('auth-needed', {
+            reason: err.message,
+            failures: this.consecutiveAuthFailures,
+          });
+        }
+      }
+
       return null;
     }
   }

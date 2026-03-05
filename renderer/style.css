@@ -19,13 +19,16 @@ body {
 /* Widget Container */
 #widget-container {
   width: 180px;
-  height: 200px;
+  height: 240px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
   padding: 10px;
   position: relative;
+  /* Force GPU layer to avoid macOS transparent window rendering bugs */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
 }
 
 /* ── Hover Bubble ── */
@@ -222,6 +225,10 @@ body {
   transform-origin: center bottom;
   transition: transform 0.1s ease;
   overflow: visible;
+  /* Force GPU compositing — prevents macOS transparent window render glitches */
+  will-change: transform;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 /* ── Resize Handle (bottom-right of robot) ── */
@@ -412,6 +419,25 @@ body.dragging #widget-container {
   color: #666;
 }
 
+/* Auth-needed state (login retry detection) — red pulsing glow on robot */
+.auth-needed .pixel-robot {
+  animation: auth-pulse 2s ease-in-out infinite !important;
+}
+
+@keyframes auth-pulse {
+  0%, 100% { filter: drop-shadow(0 0 0px transparent); }
+  50% { filter: drop-shadow(0 0 6px rgba(255, 51, 51, 0.7)); }
+}
+
+.auth-needed #countdown-text {
+  color: #ff3333;
+}
+
+.auth-needed #countdown-text::after {
+  content: ' — re-login needed';
+  color: #ff3333;
+}
+
 /* Demo mode indicator */
 .demo-mode::after {
   content: ' (demo)';
@@ -520,4 +546,141 @@ body.dragging #widget-container {
 
 #onboarding-next:hover {
   background: #d9936f;
+}
+
+/* ── Update Notification Popup ── */
+#update-popup {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  pointer-events: auto;
+  animation: update-slide-in 0.3s ease-out;
+}
+
+#update-popup.hidden {
+  display: none;
+}
+
+@keyframes update-slide-in {
+  0% { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+#update-popup-inner {
+  background: #1a1a1a;
+  border: 2px solid #cd7f5d;
+  padding: 10px 12px;
+  min-width: 160px;
+  max-width: 180px;
+  text-align: center;
+}
+
+/* Pixel corner accents */
+#update-popup-inner::before,
+#update-popup-inner::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #cd7f5d;
+}
+#update-popup-inner::before { top: -2px; left: -2px; }
+#update-popup-inner::after { top: -2px; right: -2px; }
+
+#update-icon {
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+#update-message {
+  color: #ddd;
+  font-size: 9px;
+  font-weight: bold;
+  margin-bottom: 2px;
+}
+
+#update-version {
+  color: #cd7f5d;
+  font-size: 8px;
+  margin-bottom: 8px;
+}
+
+#update-progress-bar {
+  height: 3px;
+  background: #222;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+#update-progress-bar.hidden {
+  display: none;
+}
+
+#update-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: #cd7f5d;
+  transition: width 0.3s ease;
+}
+
+/* Segmented effect */
+#update-progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.15) 2px,
+    rgba(0, 0, 0, 0.15) 3px
+  );
+}
+
+#update-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+#update-btn {
+  background: #cd7f5d;
+  color: #0d0d0d;
+  border: none;
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: bold;
+  padding: 3px 12px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+}
+
+#update-btn:hover {
+  background: #d9936f;
+}
+
+#update-btn.restart {
+  background: #39ff14;
+  color: #0d0d0d;
+}
+
+#update-btn.restart:hover {
+  background: #5aff3e;
+}
+
+#update-dismiss {
+  background: transparent;
+  color: #666;
+  border: 1px solid #333;
+  font-family: inherit;
+  font-size: 8px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+#update-dismiss:hover {
+  color: #999;
+  border-color: #555;
 }

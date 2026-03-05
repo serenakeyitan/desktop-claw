@@ -32,8 +32,8 @@ function renderRanking(ranking, total) {
   const emptyState = document.getElementById('empty-state');
   const totalValue = document.getElementById('total-value');
 
-  // Update total
-  totalValue.textContent = `${total.totalDelta.toFixed(1)}%`;
+  // Update total — show token count
+  totalValue.textContent = formatTokens(total.totalTokens || 0);
 
   if (!ranking || ranking.length === 0) {
     tableBody.innerHTML = '';
@@ -41,8 +41,8 @@ function renderRanking(ranking, total) {
     return;
   }
 
-  // Hide empty state and build rows
-  const maxDelta = ranking[0]?.totalDelta || 1;
+  // Build rows — bar width is proportional to the top project's token count
+  const maxTokens = ranking[0]?.totalTokens || 1;
 
   const fragment = document.createDocumentFragment();
 
@@ -50,7 +50,7 @@ function renderRanking(ranking, total) {
     const row = document.createElement('div');
     row.className = `ranking-row${item.rank <= 3 ? ` rank-${item.rank}` : ''}`;
 
-    const barWidth = maxDelta > 0 ? (item.totalDelta / maxDelta) * 100 : 0;
+    const barWidth = maxTokens > 0 ? (item.totalTokens / maxTokens) * 100 : 0;
 
     row.innerHTML = `
       <span class="col-rank">${item.rank}</span>
@@ -58,7 +58,7 @@ function renderRanking(ranking, total) {
         <span class="project-name">${escapeHtml(item.project)}</span>
         <div class="usage-bar"><div class="usage-bar-fill" style="width: ${barWidth}%"></div></div>
       </div>
-      <span class="col-usage"><span class="usage-value">${item.totalDelta.toFixed(1)}%</span></span>
+      <span class="col-usage"><span class="usage-value">${formatTokens(item.totalTokens || 0)}</span></span>
       <span class="col-time">${formatTime(item.totalTimeMs)}</span>
       <span class="col-sessions">${item.sessionCount}</span>
     `;
@@ -75,6 +75,18 @@ function createEmptyState() {
   el.id = 'empty-state';
   el.textContent = 'No usage data yet. Start using Claude Code!';
   return el;
+}
+
+/**
+ * Format a token count to a compact human-readable string.
+ * e.g., 1500 → "1500", 12345 → "12K", 1234567 → "1.2M", 1234567890 → "1.2B"
+ */
+function formatTokens(tokens) {
+  if (!tokens || tokens <= 0) return '0';
+  if (tokens >= 1_000_000_000) return `${(tokens / 1_000_000_000).toFixed(1)}B`;
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
+  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(0)}K`;
+  return String(Math.round(tokens));
 }
 
 function formatTime(ms) {

@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupAddFriend();
   setupInviteModal();
   setupProfileModal();
+  setupContextMenu();
   setupSignOut();
   loadData();
 });
@@ -167,28 +168,49 @@ async function loadFriendStatus() {
 
 function renderRanking(data) {
   const tableBody = document.getElementById('table-body');
+  const rankBanner = document.getElementById('your-rank-banner');
+
+  // Hide banner by default
+  rankBanner.classList.add('hidden');
+  rankBanner.innerHTML = '';
 
   if (!data || data.length === 0) {
     tableBody.innerHTML = '<div class="empty-state">No data yet. Add friends and start coding!</div>';
     return;
   }
 
-  // Compute estimated tokens for each user (used for bar width comparison)
+  // Use total_tokens from the server (per-row tier conversion) or local fallback.
+  // Only fall back to client-side conversion for old server responses that
+  // don't include total_tokens yet (before the SQL migration runs).
   const estimatedTokens = data.map(item =>
-    (item.total_usage || 0) / 100 * getTokensPerWindow(item.subscription_tier)
+    item.total_tokens != null && item.total_tokens > 0
+      ? item.total_tokens
+      : (item.total_usage || 0) / 100 * getTokensPerWindow(item.subscription_tier)
   );
   const maxTokens = estimatedTokens[0] || 1;
   const fragment = document.createDocumentFragment();
 
+  // Find the current user's index in the ranking
+  let selfIndex = -1;
+
   data.forEach((item, index) => {
     const rank = index + 1;
+
+    // Detect if this is the current user
+    const isSelf = item.user_id === 'self'
+      || (myProfile && item.user_id === myProfile.id)
+      || (myProfile && item.username === myProfile.username);
+
+    if (isSelf) selfIndex = index;
+
     const row = document.createElement('div');
-    row.className = `ranking-row${rank <= 3 ? ` rank-${rank}` : ''}`;
+    row.className = `ranking-row${rank <= 3 ? ` rank-${rank}` : ''}${isSelf ? ' self-row' : ''}`;
+    if (isSelf) row.id = 'self-ranking-row';
 
     const barWidth = maxTokens > 0 ? (estimatedTokens[index] / maxTokens) * 100 : 0;
     const isVibing = item.is_vibing;
     const timeStr = formatTime(item.total_time_ms || 0);
-    const usageStr = formatUsage(item.total_usage || 0, item.subscription_tier);
+    const usageStr = formatTokens(estimatedTokens[index]);
     const sessions = item.log_count || 0;
     const project = item.current_project || '';
 
@@ -222,6 +244,13 @@ function renderRanking(data) {
     // Attach social icon click handlers
     attachSocialIconHandlers(row);
 
+    // Attach right-click context menu for removing friends
+    if (item.user_id && window._showFriendContextMenu) {
+      row.addEventListener('contextmenu', (e) => {
+        window._showFriendContextMenu(e, item.user_id, item.display_name || item.username);
+      });
+    }
+
     // Attach poke handler
     if (showPoke) {
       const pokeBtn = row.querySelector('.poke-btn');
@@ -231,12 +260,12 @@ function renderRanking(data) {
         pokeBtn.textContent = '...';
 
         // Check isSelf at click time (myProfile may have loaded by now)
-        const isSelf = item.user_id === 'self'
+        const clickIsSelf = item.user_id === 'self'
           || (myProfile && item.user_id === myProfile.id)
           || (myProfile && item.username === myProfile.username);
 
         // Self-poke: trigger robot animation, no server call
-        if (isSelf) {
+        if (clickIsSelf) {
           window.socialAPI.triggerSelfPoke();
           pokeBtn.textContent = 'Poked!';
           pokeBtn.classList.add('poked');
@@ -274,6 +303,32 @@ function renderRanking(data) {
 
   tableBody.innerHTML = '';
   tableBody.appendChild(fragment);
+
+  // Show "You are ranked #X" banner
+  if (selfIndex >= 0) {
+    const selfRank = selfIndex + 1;
+    const totalCount = data.length;
+    const tabLabel = currentTab === 'friends' ? 'among friends' : 'globally';
+    rankBanner.innerHTML = `
+      <span class="rank-label">You are ranked</span>
+      <span class="rank-number">#${selfRank}</span>
+      <span class="rank-label">of ${totalCount} ${tabLabel}</span>
+      <button class="scroll-to-me" id="scroll-to-me-btn">Show me</button>
+    `;
+    rankBanner.classList.remove('hidden');
+
+    // "Show me" button scrolls to self row
+    document.getElementById('scroll-to-me-btn').addEventListener('click', () => {
+      const selfRow = document.getElementById('self-ranking-row');
+      if (selfRow) {
+        selfRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Brief flash effect
+        selfRow.style.transition = 'background 0.3s';
+        selfRow.style.background = 'rgba(205, 127, 93, 0.15)';
+        setTimeout(() => { selfRow.style.background = ''; }, 1000);
+      }
+    });
+  }
 }
 
 // ── Render Status List ──────────────────────────────────────────────────────
@@ -314,6 +369,14 @@ function renderStatusList(data) {
     `;
 
     attachSocialIconHandlers(card);
+
+    // Attach right-click context menu for removing friends
+    if (item.user_id && window._showFriendContextMenu) {
+      card.addEventListener('contextmenu', (e) => {
+        window._showFriendContextMenu(e, item.user_id, item.display_name || item.username);
+      });
+    }
+
     fragment.appendChild(card);
   }
 
@@ -513,6 +576,7 @@ async function buildLocalSelfRanking(period) {
       twitter_username: profile?.twitter_username || null,
       github_username: profile?.github_username || null,
       total_usage: total.totalDelta || 0,
+      total_tokens: total.totalTokens || 0,
       total_time_ms: total.totalTimeMs || 0,
       log_count: localData?.ranking?.reduce((sum, r) => sum + (r.sessionCount || 0), 0) || 0,
       is_vibing: isVibing,
@@ -580,13 +644,6 @@ function getTokensPerWindow(tier) {
   return TOKENS_BY_TIER[tier] || TOKENS_BY_TIER.pro;
 }
 
-function formatUsage(totalPercent, tier) {
-  if (!totalPercent || totalPercent <= 0) return '0';
-  const tokensPerWindow = getTokensPerWindow(tier);
-  const tokens = (totalPercent / 100) * tokensPerWindow;
-  return formatTokens(tokens);
-}
-
 function formatTokens(tokens) {
   if (tokens >= 1_000_000_000) return `${(tokens / 1_000_000_000).toFixed(1)}B`;
   if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
@@ -618,6 +675,70 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+// ── Context Menu (right-click to remove friend) ──────────────────────────────
+
+function setupContextMenu() {
+  const menu = document.getElementById('context-menu');
+  const removeItem = document.getElementById('ctx-remove-friend');
+  let targetUserId = null;
+  let targetUsername = null;
+
+  // Close menu on any click or escape
+  document.addEventListener('click', () => menu.classList.add('hidden'));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') menu.classList.add('hidden');
+  });
+
+  // Remove friend handler
+  removeItem.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    menu.classList.add('hidden');
+
+    if (!targetUserId) return;
+
+    // Don't allow removing yourself
+    const isSelf = targetUserId === 'self'
+      || (myProfile && targetUserId === myProfile.id);
+    if (isSelf) return;
+
+    try {
+      await window.socialAPI.removeFriend(targetUserId);
+      loadData(); // refresh
+    } catch (err) {
+      console.error('Failed to remove friend:', err);
+    }
+  });
+
+  // Expose a function to show the context menu for a given user
+  window._showFriendContextMenu = function(e, userId, username) {
+    // Don't show for yourself
+    const isSelf = userId === 'self'
+      || (myProfile && userId === myProfile.id);
+    if (isSelf) return;
+
+    // Only show on friends tab
+    if (currentTab !== 'friends' && currentTab !== 'status') return;
+
+    e.preventDefault();
+    targetUserId = userId;
+    targetUsername = username;
+
+    // Position the menu at cursor
+    menu.style.left = `${e.clientX}px`;
+    menu.style.top = `${e.clientY}px`;
+
+    // Keep menu within viewport
+    menu.classList.remove('hidden');
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+      menu.style.left = `${window.innerWidth - rect.width - 4}px`;
+    }
+    if (rect.bottom > window.innerHeight) {
+      menu.style.top = `${window.innerHeight - rect.height - 4}px`;
+    }
+  };
 }
 
 // ── Auto-refresh every 30 seconds ───────────────────────────────────────────

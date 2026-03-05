@@ -50,32 +50,67 @@ const supabaseClient = require('./supabase-client');
 const SocialSync = require('./social-sync');
 const log = require('./logger');
 
-// ── Auto-updater (graceful — works when code-signed, silent otherwise) ──
+// ── Auto-updater ────────────────────────────────────────────────────────────
+let updaterInstance = null;
+let updateState = { status: 'idle', version: null, progress: 0, error: null };
+// status: 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'not-available' | 'error'
+
+function sendUpdateStatus() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('update-status', updateState);
+  }
+}
+
 function initAutoUpdater() {
   try {
     const { autoUpdater } = require('electron-updater');
-    autoUpdater.autoDownload = true;
+    updaterInstance = autoUpdater;
+    autoUpdater.autoDownload = false;  // We'll prompt the user first
     autoUpdater.autoInstallOnAppQuit = true;
+
+    autoUpdater.on('checking-for-update', () => {
+      log('Checking for updates...');
+      updateState = { status: 'checking', version: null, progress: 0, error: null };
+      sendUpdateStatus();
+    });
 
     autoUpdater.on('update-available', (info) => {
       log('Update available:', info.version);
-    });
-    autoUpdater.on('update-downloaded', (info) => {
-      log('Update downloaded:', info.version, '— will install on quit');
-      // Optionally notify the user via Notification
-      if (Notification.isSupported()) {
-        new Notification({
-          title: 'All Day Poke Update',
-          body: `v${info.version} downloaded. Restart to update.`,
-        }).show();
-      }
-    });
-    autoUpdater.on('error', (err) => {
-      // Silent fail — expected when app is unsigned or running from source
-      log('Auto-updater not available:', err.message);
+      updateState = { status: 'available', version: info.version, progress: 0, error: null };
+      sendUpdateStatus();
     });
 
-    autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+    autoUpdater.on('update-not-available', (info) => {
+      log('Already up to date:', info.version);
+      updateState = { status: 'not-available', version: info.version, progress: 0, error: null };
+      sendUpdateStatus();
+    });
+
+    autoUpdater.on('download-progress', (progress) => {
+      updateState = { ...updateState, status: 'downloading', progress: Math.round(progress.percent) };
+      sendUpdateStatus();
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+      log('Update downloaded:', info.version, '— ready to install');
+      updateState = { status: 'downloaded', version: info.version, progress: 100, error: null };
+      sendUpdateStatus();
+    });
+
+    autoUpdater.on('error', (err) => {
+      log('Auto-updater error:', err.message);
+      updateState = { status: 'error', version: null, progress: 0, error: err.message };
+      sendUpdateStatus();
+    });
+
+    // Check on startup (silent — the renderer will show a popup if update is available)
+    autoUpdater.checkForUpdates().catch(() => {});
+
+    // Check periodically (every 4 hours)
+    setInterval(() => {
+      autoUpdater.checkForUpdates().catch(() => {});
+    }, 4 * 60 * 60 * 1000);
+
   } catch (err) {
     // electron-updater not available (e.g., running from source with npx electron .)
     log('Auto-updater skipped:', err.message);
@@ -219,7 +254,7 @@ function createMainWindow() {
 
   // Calculate default position (bottom-right with 20px margin)
   const windowWidth = 180;
-  const windowHeight = 200;
+  const windowHeight = 240;
   let x = config.position.x !== null ? config.position.x : screenWidth - windowWidth - 20;
   let y = config.position.y !== null ? config.position.y : screenHeight - windowHeight - 20;
 
@@ -232,6 +267,7 @@ function createMainWindow() {
     height: windowHeight,
     x: x,
     y: y,
+    show: false,              // Wait for ready-to-show to avoid partial render
     transparent: true,
     frame: false,
     alwaysOnTop: true,
@@ -249,6 +285,28 @@ function createMainWindow() {
     vibrancy: 'none',
     type: 'panel',
     level: 'screen-saver'
+  });
+
+  // Don't show the window until content is fully painted — avoids the
+  // macOS bug where transparent frameless windows render blank/partial.
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+
+    // Force macOS to composite the transparent window by nudging it
+    // 1px and back.  This is the most reliable workaround for the
+    // blank-window bug on macOS with transparent + frameless windows.
+    const [cx, cy] = mainWindow.getPosition();
+    mainWindow.setPosition(cx + 1, cy);
+    setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.setPosition(cx, cy);
+      }
+    }, 50);
+
+    // Belt-and-suspenders: force a full repaint via the renderer
+    if (mainWindow.webContents) {
+      mainWindow.webContents.invalidate();
+    }
   });
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
@@ -357,6 +415,49 @@ async function initializeServices() {
       // Start automatic updates
       autoUsageUpdater.start(1); // Check every minute
 
+      // ── Login retry detection ──────────────────────────────────────────
+      // When Claude Code credentials go missing or expire, prompt re-login.
+      autoUsageUpdater.claudeTracker.on('auth-needed', (data) => {
+        log(`Auth needed detected: ${data.reason} (${data.failures} failures)`);
+
+        // Notify the user
+        if (Notification.isSupported()) {
+          new Notification({
+            title: 'Claude login required',
+            body: 'Claude Code credentials expired or missing. Click the robot and re-authenticate.',
+            silent: false,
+          }).show();
+        }
+
+        // Send auth-error state to the renderer so the robot shows an indicator
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('token-update', {
+            used: 0,
+            limit: 0,
+            pct: 0,
+            reset_at: null,
+            error: 'auth-needed',
+            authNeeded: true,
+          });
+        }
+
+        // Auto-open the setup window for re-authentication
+        if (!setupWindow) {
+          createSetupWindow();
+        } else {
+          setupWindow.focus();
+        }
+      });
+
+      autoUsageUpdater.claudeTracker.on('auth-recovered', () => {
+        log('Auth recovered — credentials are valid again');
+
+        // Clear the auth-error state on the renderer
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('auth-recovered');
+        }
+      });
+
       // Listen for updates — attribute usage deltas to busy sessions
       autoUsageUpdater.claudeTracker.on('usage-updated', (data) => {
         if (mainWindow) {
@@ -369,9 +470,18 @@ async function initializeServices() {
           socialSync.setSubscriptionTier(data.subscriptionTier);
         }
 
-        // Attribution: compute delta and assign to busy sessions
+        // Keep UsageDB's current tier up-to-date so legacy entries
+        // (without a stored tier) convert using the correct plan.
+        if (usageDB && data.subscriptionTier) {
+          usageDB.setCurrentTier(data.subscriptionTier);
+        }
+
+        // Attribution: compute delta and assign to busy sessions.
+        // Pass the subscription tier so token counts are computed correctly
+        // even if the user later switches plans.
         if (usageDB && sessionMonitor) {
           const currentPct = data.percentage ?? data.pct ?? null;
+          const tier = data.subscriptionTier || 'pro';
           if (currentPct !== null && lastUsagePct !== null) {
             const delta = currentPct - lastUsagePct;
             if (delta > 0) {
@@ -383,15 +493,15 @@ async function initializeServices() {
                 // Split delta equally among busy sessions
                 const perSession = delta / busySessions.length;
                 for (const s of busySessions) {
-                  const project = s.project || 'unknown';
+                  const project = s.project || (s.cwd ? require('path').basename(s.cwd) : 'session');
                   // Estimate active time as the full poll interval (60s)
-                  usageDB.recordUsage(project, perSession, 60000);
+                  usageDB.recordUsage(project, perSession, 60000, tier);
                 }
-                log(`Usage attributed: +${delta.toFixed(1)}% to ${busySessions.map(s => s.project).join(', ')}`);
+                log(`Usage attributed: +${delta.toFixed(1)}% (${tier}) to ${busySessions.map(s => s.project).join(', ')}`);
               } else {
                 // No busy sessions — attribute to "other" (web usage, etc.)
-                usageDB.recordUsage('(other)', delta, 0);
-                log(`Usage attributed: +${delta.toFixed(1)}% to (other) — no active sessions`);
+                usageDB.recordUsage('(other)', delta, 0, tier);
+                log(`Usage attributed: +${delta.toFixed(1)}% (${tier}) to (other) — no active sessions`);
               }
             }
           }
@@ -492,12 +602,26 @@ async function initializeServices() {
       }
     });
 
+    // Track last notification time per project to prevent duplicates
+    const lastNotificationAt = new Map();
+    const NOTIFICATION_DEDUP_MS = 60 * 1000; // 60-second dedup window at notification level
+
     sessionMonitor.on('session-task-finished', (data) => {
       // A session went from busy to idle — the key notification
+      // Secondary dedup: guard against multiple events reaching here for the same project
+      const key = data.project || (data.cwd ? require('path').basename(data.cwd) : data.id);
+      const now = Date.now();
+      const lastTime = lastNotificationAt.get(key) || 0;
+      if (now - lastTime < NOTIFICATION_DEDUP_MS) {
+        log(`Notification suppressed (dedup): ${key} — last notified ${Math.round((now - lastTime) / 1000)}s ago`);
+        return;
+      }
+      lastNotificationAt.set(key, now);
+
       if (Notification.isSupported()) {
         new Notification({
           title: 'Claude finished running',
-          body: `${data.project || 'Unknown project'} is done (ran for ${data.busyDuration})`,
+          body: `${data.project || 'Session'} is done (ran for ${data.busyDuration})`,
           silent: false,
         }).show();
       }
@@ -587,6 +711,72 @@ function setActivityState(state) {
         setActivityState('idle');
       }
     }, config.activity_timeout_seconds * 1000);
+  }
+}
+
+// ── Update IPC handlers ─────────────────────────────────────────────────────
+ipcMain.handle('check-for-updates', () => {
+  if (updaterInstance) {
+    updaterInstance.checkForUpdates().catch(() => {});
+  } else {
+    // Running from source — fall back to GitHub API check
+    checkForUpdatesManual();
+  }
+  return updateState;
+});
+
+ipcMain.handle('download-update', () => {
+  if (updaterInstance && updateState.status === 'available') {
+    updaterInstance.downloadUpdate().catch(() => {});
+  }
+});
+
+ipcMain.handle('install-update', () => {
+  if (updaterInstance && updateState.status === 'downloaded') {
+    updaterInstance.quitAndInstall(false, true);
+  }
+});
+
+ipcMain.handle('get-update-status', () => {
+  return updateState;
+});
+
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
+});
+
+// Manual update check via GitHub API (fallback for unsigned/source builds)
+async function checkForUpdatesManual() {
+  try {
+    updateState = { status: 'checking', version: null, progress: 0, error: null };
+    sendUpdateStatus();
+
+    const https = require('https');
+    const data = await new Promise((resolve, reject) => {
+      https.get('https://api.github.com/repos/serenakeyitan/desktop-claw/releases/latest', {
+        headers: { 'User-Agent': 'AllDayPoke' }
+      }, (res) => {
+        let body = '';
+        res.on('data', (chunk) => body += chunk);
+        res.on('end', () => resolve(JSON.parse(body)));
+        res.on('error', reject);
+      }).on('error', reject);
+    });
+
+    const latestVersion = (data.tag_name || '').replace(/^v/, '');
+    const currentVersion = app.getVersion();
+
+    if (latestVersion && latestVersion !== currentVersion) {
+      updateState = { status: 'available', version: latestVersion, progress: 0, error: null, manualUrl: data.html_url };
+      sendUpdateStatus();
+    } else {
+      updateState = { status: 'not-available', version: currentVersion, progress: 0, error: null };
+      sendUpdateStatus();
+    }
+  } catch (err) {
+    log('Manual update check failed:', err.message);
+    updateState = { status: 'error', version: null, progress: 0, error: err.message };
+    sendUpdateStatus();
   }
 }
 
@@ -902,7 +1092,11 @@ ipcMain.handle('social-sign-up', async (event, email, password, username, twitte
     if (pendingInviteCode && socialSync) {
       try {
         const addResult = await socialSync.addFriend(pendingInviteCode);
-        if (addResult?.success) friendAdded = addResult.friend?.username;
+        if (addResult?.success) {
+          friendAdded = addResult.friend?.username;
+          // Ensure social window opens when user clicks "Continue"
+          if (!pendingWindowAfterLogin) pendingWindowAfterLogin = 'social';
+        }
       } catch { /* ignore */ }
       pendingInviteCode = null;
     }
@@ -930,12 +1124,16 @@ ipcMain.handle('social-sign-in', async (event, email, password) => {
     if (pendingInviteCode && socialSync) {
       try {
         const addResult = await socialSync.addFriend(pendingInviteCode);
-        if (addResult?.success && Notification.isSupported()) {
-          new Notification({
-            title: 'Friend added!',
-            body: `${addResult.friend?.username || 'New friend'} has been added.`,
-            silent: false,
-          }).show();
+        if (addResult?.success) {
+          // Ensure social window opens to show the new friend
+          if (!pendingWindowAfterLogin) pendingWindowAfterLogin = 'social';
+          if (Notification.isSupported()) {
+            new Notification({
+              title: 'Friend added!',
+              body: `${addResult.friend?.username || 'New friend'} has been added.`,
+              silent: false,
+            }).show();
+          }
         }
       } catch { /* ignore */ }
       pendingInviteCode = null;
@@ -1167,6 +1365,28 @@ ipcMain.handle('show-context-menu', (event) => {
     },
     { type: 'separator' },
     {
+      label: updateState.status === 'available' ? `🔄 Update to v${updateState.version}` :
+             updateState.status === 'downloading' ? `🔄 Downloading... ${updateState.progress}%` :
+             updateState.status === 'downloaded' ? '🔄 Restart to Update' :
+             '🔄 Check for Updates',
+      click: () => {
+        if (updateState.status === 'downloaded') {
+          // Ready to install — quit and install
+          if (updaterInstance) updaterInstance.quitAndInstall(false, true);
+        } else if (updateState.status === 'available') {
+          // Start download
+          if (updaterInstance) updaterInstance.downloadUpdate().catch(() => {});
+        } else {
+          // Check for updates
+          if (updaterInstance) {
+            updaterInstance.checkForUpdates().catch(() => {});
+          } else {
+            checkForUpdatesManual();
+          }
+        }
+      }
+    },
+    {
       label: 'Lock Position',
       type: 'checkbox',
       checked: loadConfig().window_locked,
@@ -1255,6 +1475,7 @@ async function handleDeepLink(url) {
   } else {
     // Not logged in — queue the code and open login
     pendingInviteCode = code;
+    pendingWindowAfterLogin = 'social'; // open social window after login to show new friend
     openLoginWindow();
   }
 }

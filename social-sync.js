@@ -77,7 +77,8 @@ class SocialSync extends EventEmitter {
 
     if (!entries || entries.length === 0) return;
 
-    // Map local entries to the server schema
+    // Map local entries to the server schema.
+    // Include subscription tier so server-side ranking can also compute tokens.
     const rows = entries.map(e => ({
       user_id: user.id,
       project: e.project,
@@ -85,6 +86,7 @@ class SocialSync extends EventEmitter {
       active_time_ms: e.activeTimeMs || 0,
       logged_at: e.timestamp,
       date: e.date,
+      tier: e.tier || 'pro',
     }));
 
     const { error } = await sb.from('usage_logs').insert(rows);
@@ -218,7 +220,7 @@ class SocialSync extends EventEmitter {
    * @param {'today'|'7d'|'30d'|'all'} period
    * @param {number} limit
    */
-  async getGlobalRanking(period = 'all', limit = 50) {
+  async getGlobalRanking(period = 'all', limit = 200) {
     const sb = getSupabase();
     if (!sb) return [];
     const { data, error } = await sb.rpc('get_global_ranking', {

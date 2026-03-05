@@ -18,6 +18,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   quitApp: () => ipcRenderer.invoke('quit-app'),
   setEnvApiKey: (apiKey) => ipcRenderer.invoke('set-env-api-key', apiKey),
 
+  // Auto-update
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  downloadUpdate: () => ipcRenderer.invoke('download-update'),
+  installUpdate: () => ipcRenderer.invoke('install-update'),
+  getUpdateStatus: () => ipcRenderer.invoke('get-update-status'),
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  onUpdateStatus: (callback) => {
+    ipcRenderer.on('update-status', (event, data) => callback(data));
+  },
+
   // Setup flow
   checkClaudeInstalled: () => ipcRenderer.invoke('check-claude-installed'),
   checkClaudeCredentials: () => ipcRenderer.invoke('check-claude-credentials'),
@@ -51,6 +61,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   onboardingDone: () => ipcRenderer.invoke('onboarding-done'),
 
+  // Auth recovery (login retry detection)
+  onAuthRecovered: (callback) => {
+    ipcRenderer.on('auth-recovered', (event) => callback());
+  },
+
   // Remove listeners
   removeAllListeners: () => {
     ipcRenderer.removeAllListeners('token-update');
@@ -59,5 +74,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners('session-update');
     ipcRenderer.removeAllListeners('poke-received');
     ipcRenderer.removeAllListeners('start-onboarding');
+    ipcRenderer.removeAllListeners('update-status');
+    ipcRenderer.removeAllListeners('auth-recovered');
   }
 });

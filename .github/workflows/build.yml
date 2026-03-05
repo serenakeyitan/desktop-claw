@@ -32,11 +32,14 @@ jobs:
       - name: Build macOS DMG
         run: npx electron-builder --mac --publish never
 
-      - name: Upload DMG artifact
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: macos-dmg
-          path: dist/*.dmg
+          name: macos-build
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/latest-mac.yml
 
   release:
     needs: build-mac
@@ -48,13 +51,16 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: macos-dmg
+          name: macos-build
           path: dist
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.dmg
+          files: |
+            dist/*.dmg
+            dist/*.zip
+            dist/latest-mac.yml
           generate_release_notes: true
           draft: false
           prerelease: false

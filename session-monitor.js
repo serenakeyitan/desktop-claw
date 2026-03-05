@@ -148,10 +148,11 @@ class SessionMonitor extends EventEmitter {
    */
   _extractProjectFromDebugFile(filePath) {
     try {
-      // Read just the first 1KB — project info is always in the first few lines
+      // Read first 2KB — project info is in the first few lines but some
+      // lines (e.g., permission updates) can be long and push patterns past 1KB
       const fd = fs.openSync(filePath, 'r');
-      const buf = Buffer.alloc(1024);
-      const bytesRead = fs.readSync(fd, buf, 0, 1024, 0);
+      const buf = Buffer.alloc(2048);
+      const bytesRead = fs.readSync(fd, buf, 0, 2048, 0);
       fs.closeSync(fd);
 
       const header = buf.toString('utf8', 0, bytesRead);
@@ -170,6 +171,19 @@ class SessionMonitor extends EventEmitter {
       if (skillsMatch) {
         const cwd = skillsMatch[1];
         return { cwd, project: path.basename(cwd) };
+      }
+
+      // Pattern 3: todos file path contains the session working directory
+      // e.g., "Writing to temp file: /Users/keyitan/.claude/todos/SESSION-ID..."
+      // This doesn't give us the project, but the session may have been started
+      // from a specific directory. Try extracting from the args/command pattern:
+      // e.g., "project=<path>" in any context
+      const projectArgMatch = header.match(/project=([^\s,]+)/);
+      if (projectArgMatch) {
+        const projectPath = projectArgMatch[1].replace(/\/\.claude.*$/, '');
+        if (projectPath && projectPath.startsWith('/')) {
+          return { cwd: projectPath, project: path.basename(projectPath) };
+        }
       }
     } catch {
       // Can't read file
@@ -533,13 +547,29 @@ class SessionMonitor extends EventEmitter {
             existing.busySince = null;
 
             if (busyMs >= MIN_BUSY_DURATION_MS) {
-              // Check cooldown — don't spam notifications for the same project
-              const projectKey = existing.project || existing.id;
-              const lastNotified = this.lastNotifiedAt.get(projectKey) || 0;
-              const sinceLast = Date.now() - lastNotified;
+              // Check cooldown — don't spam notifications for the same project.
+              // Normalize the key to the project name so that different session
+              // identities for the same project share the same cooldown window.
+              const projectName = existing.project
+                || (existing.cwd ? path.basename(existing.cwd) : null);
+              const projectKey = projectName || existing.id;
+              // Check cooldown against all possible keys for this session
+              // to handle session identity flicker (cwd-based vs pid-based keys)
+              const now = Date.now();
+              const lastNotified = Math.max(
+                this.lastNotifiedAt.get(projectKey) || 0,
+                existing.cwd ? (this.lastNotifiedAt.get(existing.cwd) || 0) : 0,
+                this.lastNotifiedAt.get(existing.id) || 0,
+              );
+              const sinceLast = now - lastNotified;
 
               if (sinceLast >= NOTIFICATION_COOLDOWN_MS) {
-                this.lastNotifiedAt.set(projectKey, Date.now());
+                this.lastNotifiedAt.set(projectKey, now);
+                // Also set cooldown for the cwd and session id to prevent
+                // duplicate notifications when session identity flickers
+                if (existing.cwd) this.lastNotifiedAt.set(existing.cwd, now);
+                if (existing.id !== projectKey) this.lastNotifiedAt.set(existing.id, now);
+
                 log(`Session task finished: ${projectKey} (ran for ${busyDuration})`);
                 this.emit('session-task-finished', {
                   id: existing.id,
