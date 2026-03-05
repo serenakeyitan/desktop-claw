@@ -204,6 +204,11 @@ class SocialSync extends EventEmitter {
   async getFriendRanking(period = 'all') {
     const sb = getSupabase();
     if (!sb) return [];
+    const user = await getCurrentUser();
+    if (!user) {
+      log.warn('SocialSync: get_friend_ranking skipped — no auth session');
+      return [];
+    }
     const { data, error } = await sb.rpc('get_friend_ranking', {
       period,
       client_today: this._localDateStr(),

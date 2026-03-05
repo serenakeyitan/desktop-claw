@@ -435,11 +435,14 @@ function setupInviteModal() {
   const closeBtn = document.getElementById('modal-close-btn');
   const copyBtn = document.getElementById('modal-copy-btn');
 
+  const copyCodeBtn = document.getElementById('modal-copy-code-btn');
+
   inviteBtn.addEventListener('click', async () => {
     if (!myProfile) await loadProfile();
     if (myProfile?.invite_code) {
       const link = `https://serenakeyitan.github.io/desktop-claw/invite/?code=${myProfile.invite_code}`;
       document.getElementById('modal-invite-link').textContent = link;
+      document.getElementById('modal-invite-code').textContent = myProfile.invite_code;
     }
     modal.classList.remove('hidden');
   });
@@ -453,6 +456,14 @@ function setupInviteModal() {
     navigator.clipboard.writeText(link).then(() => {
       copyBtn.textContent = 'Copied!';
       setTimeout(() => { copyBtn.textContent = 'Copy Link'; }, 2000);
+    });
+  });
+
+  copyCodeBtn.addEventListener('click', () => {
+    const code = document.getElementById('modal-invite-code').textContent;
+    navigator.clipboard.writeText(code).then(() => {
+      copyCodeBtn.textContent = 'Copied!';
+      setTimeout(() => { copyCodeBtn.textContent = 'Copy Code'; }, 2000);
     });
   });
 

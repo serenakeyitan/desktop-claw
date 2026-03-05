@@ -1331,6 +1331,12 @@ ipcMain.handle('show-context-menu', (event) => {
     },
     { type: 'separator' },
     {
+      label: 'Reload',
+      click: () => {
+        if (mainWindow) mainWindow.reload();
+      }
+    },
+    {
       label: '🏆 Usage Ranking',
       click: () => {
         openRankingWindow();
@@ -1339,8 +1345,14 @@ ipcMain.handle('show-context-menu', (event) => {
     {
       label: '🌐 Social Ranking',
       click: async () => {
-        const user = await supabaseClient.getCurrentUser();
+        let user = await supabaseClient.getCurrentUser();
+        // If session was lost, try to restore it
+        if (!user) {
+          user = await supabaseClient.restoreSession();
+        }
         if (user) {
+          // Ensure social sync is running
+          if (!socialSync) await startSocialSync();
           openSocialWindow();
         } else {
           pendingWindowAfterLogin = 'social';

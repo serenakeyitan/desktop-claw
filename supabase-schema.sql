@@ -308,13 +308,14 @@ begin
         coalesce(sum(ul.active_time_ms), 0) as total_time_ms,
         count(ul.id) as log_count,
         us.is_vibing,
+        us.current_project,
         us.last_active_at
       from public.profiles p
       left join public.usage_logs ul
         on ul.user_id = p.id and ul.date >= cutoff
       left join public.user_status us
         on us.user_id = p.id
-      group by p.id, p.username, p.display_name, p.subscription_tier, p.twitter_username, p.github_username, us.is_vibing, us.last_active_at
+      group by p.id, p.username, p.display_name, p.subscription_tier, p.twitter_username, p.github_username, us.is_vibing, us.current_project, us.last_active_at
       order by coalesce(sum(_tokens_for_row(ul.delta_percent, ul.tier, p.subscription_tier)), 0) desc
       limit lim
     ) r

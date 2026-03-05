@@ -466,6 +466,17 @@ body {
   line-height: 1.4;
 }
 
+.invite-code-display {
+  color: #cd7f5d;
+  font-size: 16px;
+  font-weight: bold;
+  letter-spacing: 4px;
+  margin-bottom: 8px;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
 .modal-hint {
   color: #555;
   font-size: 9px;

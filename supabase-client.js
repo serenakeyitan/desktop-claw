@@ -107,6 +107,7 @@ async function restoreSession() {
   const saved = loadSession();
   if (!saved?.access_token || !saved?.refresh_token) return null;
 
+  // Try setting the session with stored tokens
   const { data, error } = await sb.auth.setSession({
     access_token: saved.access_token,
     refresh_token: saved.refresh_token,
@@ -114,6 +115,21 @@ async function restoreSession() {
 
   if (error || !data.session) {
     log.warn('supabase-client: session restore failed', error?.message);
+
+    // If the refresh token was "already used" (common with Supabase),
+    // try refreshing the session directly — the access token might still
+    // be valid enough to obtain a new refresh token.
+    const { data: refreshData, error: refreshErr } = await sb.auth.refreshSession();
+    if (!refreshErr && refreshData?.session) {
+      log('supabase-client: session recovered via refresh');
+      saveSession({
+        access_token: refreshData.session.access_token,
+        refresh_token: refreshData.session.refresh_token,
+      });
+      return refreshData.session.user;
+    }
+
+    log.warn('supabase-client: refresh also failed', refreshErr?.message);
     clearSession();
     return null;
   }
