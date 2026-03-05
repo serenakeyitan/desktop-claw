@@ -1320,9 +1320,8 @@ function stopPokePolling() {
 ipcMain.handle('show-context-menu', (event) => {
   const template = [
     {
-      label: '🔐 Change Authentication',
+      label: '🔑 Claude Login',
       click: () => {
-        // Open setup wizard for re-login
         if (!setupWindow) {
           createSetupWindow();
         } else {
@@ -1331,20 +1330,6 @@ ipcMain.handle('show-context-menu', (event) => {
       }
     },
     { type: 'separator' },
-    {
-      label: 'Reload',
-      click: () => {
-        if (mainWindow) {
-          mainWindow.reload();
-        }
-      }
-    },
-    {
-      label: 'Open Config',
-      click: () => {
-        shell.openPath(CONFIG_FILE);
-      }
-    },
     {
       label: '🏆 Usage Ranking',
       click: () => {

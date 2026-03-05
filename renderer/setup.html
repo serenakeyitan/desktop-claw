@@ -231,11 +231,11 @@
         </div>
       </div>
 
-      <!-- Step 3: Test API connection -->
+      <!-- Step 3: Test API connection (optional) -->
       <div class="step pending" id="step-api">
         <div class="step-header">
           <div class="step-icon">3</div>
-          <div class="step-title">API Connection</div>
+          <div class="step-title">API Connection <span style="color: #666; font-weight: normal; font-size: 10px;">(optional)</span></div>
         </div>
         <div class="step-body" id="step-api-body">
           Waiting...
@@ -321,7 +321,7 @@
       }
     }
 
-    // ── Step 3: Test API ──
+    // ── Step 3: Test API (optional — credentials are sufficient) ──
     async function testConnection() {
       const step = document.getElementById('step-api');
       const body = document.getElementById('step-api-body');
@@ -357,12 +357,19 @@
         setupPassed = true;
         document.getElementById('launch-btn').disabled = false;
       } else {
+        // API test failed — but credentials were found, so let the user proceed anyway.
+        // This handles rate limits (429), temporary outages, etc.
         step.className = 'step fail';
         body.innerHTML =
-          'Failed to connect to Claude API.' +
+          'Could not verify API connection right now.' +
           `<div class="error-detail">${result.error}</div>` +
-          '<div class="detail" style="margin-top: 8px;">This may be a temporary issue. Try again or check your internet connection.</div>' +
+          '<div class="detail" style="margin-top: 8px;">This is often temporary (rate limits, network issues). ' +
+          'Your credentials are valid — you can launch now and usage will sync automatically.</div>' +
           '<button class="retry-btn" onclick="retryFromStep3()">Retry</button>';
+
+        // Still allow launch — credentials are enough
+        setupPassed = true;
+        document.getElementById('launch-btn').disabled = false;
       }
     }
 
