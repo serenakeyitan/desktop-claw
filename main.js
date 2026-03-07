@@ -376,6 +376,30 @@ function createMainWindow() {
   // Click-through: ignore mouse on transparent areas, forward events so renderer can detect hover
   mainWindow.setIgnoreMouseEvents(true, { forward: true });
 
+  // Once the renderer has fully loaded (IPC listeners registered), push any
+  // cached usage data so the bubble doesn't stay stuck on "loading...".
+  // Without this, the first token-update from initializeServices() fires
+  // before the renderer is ready and gets lost.
+  mainWindow.webContents.on('did-finish-load', () => {
+    // 1. Try the in-memory tracker data (most recent)
+    if (autoUsageUpdater && autoUsageUpdater.claudeTracker) {
+      const cached = autoUsageUpdater.claudeTracker.getUsageData();
+      if (cached && cached.percentage !== undefined) {
+        const normalized = normalizeUsageData(cached, 'claude-status');
+        if (normalized && mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('token-update', normalized);
+        }
+        return; // sent — done
+      }
+    }
+
+    // 2. Fall back to the saved usage file
+    const manualUsage = checkManualUsageFile();
+    if (manualUsage && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('token-update', manualUsage);
+    }
+  });
+
   // Initialize services
   initializeServices();
 
