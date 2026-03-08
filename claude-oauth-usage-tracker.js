@@ -28,7 +28,7 @@ const AUTH_FAIL_THRESHOLD = 3;
 class ClaudeOAuthUsageTracker extends EventEmitter {
   constructor(options = {}) {
     super();
-    this.pollIntervalMs = (options.pollIntervalMinutes || 1) * 60 * 1000;
+    this.pollIntervalMs = (options.pollIntervalMinutes || 2) * 60 * 1000;
     this.pollTimer = null;
     this.cachedToken = null;
     this.cachedTokenExpiresAt = 0;
@@ -186,6 +186,11 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
             this.cachedToken = null;
             this.cachedTokenExpiresAt = 0;
             reject(new Error(`Usage API returned 403 - credentials may be revoked`));
+          } else if (res.statusCode === 429) {
+            // Usage API rate limit — resolve with a sentinel so checkUsage()
+            // can re-use the last known good data instead of failing silently.
+            const retryAfter = res.headers['retry-after'];
+            resolve({ _rateLimited: true, retryAfterSec: retryAfter ? parseInt(retryAfter, 10) : 60 });
           } else {
             reject(new Error(`Usage API failed: HTTP ${res.statusCode} - ${data}`));
           }
@@ -279,6 +284,24 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
   }
 
   /**
+   * Load cached usage data from disk (fallback for 429s on first poll).
+   */
+  _loadCachedUsage() {
+    try {
+      if (fs.existsSync(this.usageFile)) {
+        const data = JSON.parse(fs.readFileSync(this.usageFile, 'utf8'));
+        if (data && data.pct !== undefined) {
+          log('Loaded cached usage from disk');
+          return data;
+        }
+      }
+    } catch (err) {
+      log.error('Failed to load cached usage:', err.message);
+    }
+    return null;
+  }
+
+  /**
    * Save usage data to disk for persistence.
    */
   saveUsage(normalizedData) {
@@ -301,6 +324,21 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
   async checkUsage() {
     try {
       const rawData = await this.fetchUsage();
+
+      // Handle usage API rate limit — re-emit last known data with updated timestamp
+      if (rawData && rawData._rateLimited) {
+        log(`Usage API rate-limited (retry after ${rawData.retryAfterSec}s), re-using last data`);
+        // If we have no in-memory data yet, try loading from disk
+        if (!this.lastUsageData) {
+          this.lastUsageData = this._loadCachedUsage();
+        }
+        if (this.lastUsageData) {
+          this.lastUsageData.timestamp = new Date().toISOString();
+          this.emit('usage-updated', this.lastUsageData);
+        }
+        return this.lastUsageData;
+      }
+
       const normalized = this.normalizeUsageData(rawData);
       this.lastUsageData = normalized;
       this.saveUsage(normalized);
@@ -393,10 +431,22 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
   async start() {
     log('Starting Claude OAuth usage tracker...');
 
+    // Load cached data from disk so we have something to show immediately
+    if (!this.lastUsageData) {
+      this.lastUsageData = this._loadCachedUsage();
+      if (this.lastUsageData) {
+        log('Pre-loaded cached usage data from disk');
+      }
+    }
+
     // Verify we can read credentials
     const creds = this.readKeychainCredentials();
     if (!creds) {
       log.error('No Claude Code OAuth credentials found. Is Claude Code logged in?');
+      // Still emit cached data if available so tooltip isn't empty
+      if (this.lastUsageData) {
+        this.emit('usage-updated', this.lastUsageData);
+      }
       return false;
     }
 
