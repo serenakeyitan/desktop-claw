@@ -364,6 +364,7 @@ function setupIPC() {
 // ── Update popup ────────────────────────────────────────────────────────
 
 let updatePopupDismissed = false;  // Track if user dismissed the popup this session
+let upToDateTimer = null;          // Auto-dismiss timer for "up to date" popup
 
 function setupUpdateListener() {
   const popup = document.getElementById('update-popup');
@@ -376,16 +377,28 @@ function setupUpdateListener() {
 
   window.electronAPI.onUpdateStatus((data) => {
     switch (data.status) {
+      case 'checking':
+        // Show brief "checking" feedback so user knows the click registered
+        message.textContent = 'Checking for updates...';
+        version.textContent = '';
+        progressBar.classList.add('hidden');
+        updateBtn.textContent = '...';
+        updateBtn.disabled = true;
+        updateBtn.className = '';
+        dismissBtn.style.display = 'none';
+        popup.classList.remove('hidden');
+        break;
+
       case 'available':
-        if (!updatePopupDismissed) {
-          message.textContent = 'New version available!';
-          version.textContent = `v${data.version}`;
-          progressBar.classList.add('hidden');
-          updateBtn.textContent = 'Update';
-          updateBtn.className = '';
-          dismissBtn.style.display = '';
-          popup.classList.remove('hidden');
-        }
+        updatePopupDismissed = false; // always show when user manually checked
+        message.textContent = 'New version available!';
+        version.textContent = `v${data.version}`;
+        progressBar.classList.add('hidden');
+        updateBtn.textContent = 'Update';
+        updateBtn.className = '';
+        updateBtn.disabled = false;
+        dismissBtn.style.display = '';
+        popup.classList.remove('hidden');
         break;
 
       case 'downloading':
@@ -409,9 +422,34 @@ function setupUpdateListener() {
         break;
 
       case 'not-available':
+        // Show "up to date" briefly so user gets confirmation
+        message.textContent = 'You\'re up to date';
+        version.textContent = data.version ? `v${data.version}` : '';
+        progressBar.classList.add('hidden');
+        updateBtn.textContent = 'OK';
+        updateBtn.className = '';
+        updateBtn.disabled = false;
+        dismissBtn.style.display = 'none';
+        popup.classList.remove('hidden');
+        // Auto-dismiss after 3 seconds
+        if (upToDateTimer) clearTimeout(upToDateTimer);
+        upToDateTimer = setTimeout(() => {
+          popup.classList.add('hidden');
+        }, 3000);
+        break;
+
       case 'error':
+        message.textContent = 'Update check failed';
+        version.textContent = '';
+        progressBar.classList.add('hidden');
+        updateBtn.textContent = 'Retry';
+        updateBtn.className = '';
+        updateBtn.disabled = false;
+        dismissBtn.style.display = '';
+        popup.classList.remove('hidden');
+        break;
+
       case 'idle':
-        // Hide popup unless it's already hidden
         if (!popup.classList.contains('hidden')) {
           popup.classList.add('hidden');
         }
@@ -421,11 +459,15 @@ function setupUpdateListener() {
 
   updateBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    const status = updateBtn.textContent;
-    if (status === 'Restart') {
+    const label = updateBtn.textContent;
+    if (label === 'Restart') {
       window.electronAPI.installUpdate();
-    } else if (status === 'Update') {
+    } else if (label === 'Update') {
       window.electronAPI.downloadUpdate();
+    } else if (label === 'OK') {
+      popup.classList.add('hidden');
+    } else if (label === 'Retry') {
+      window.electronAPI.checkForUpdates();
     }
   });
 

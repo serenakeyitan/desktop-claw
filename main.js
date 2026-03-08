@@ -108,10 +108,23 @@ const log = require('./logger');
 let updaterInstance = null;
 let updateState = { status: 'idle', version: null, progress: 0, error: null };
 // status: 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'not-available' | 'error'
+let updateCheckUserInitiated = false; // true when user clicked "Check for Updates"
 
 function sendUpdateStatus() {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('update-status', updateState);
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+
+  // Only show checking/not-available/error popups when user manually triggered the check.
+  // update-available, downloading, and downloaded should ALWAYS be shown.
+  const silentStatuses = ['checking', 'not-available', 'error'];
+  if (silentStatuses.includes(updateState.status) && !updateCheckUserInitiated) {
+    return;
+  }
+
+  mainWindow.webContents.send('update-status', updateState);
+
+  // Reset the flag once a terminal state is reached (not-available, error, available)
+  if (['not-available', 'error'].includes(updateState.status)) {
+    updateCheckUserInitiated = false;
   }
 }
 
@@ -828,6 +841,7 @@ function setActivityState(state) {
 
 // ── Update IPC handlers ─────────────────────────────────────────────────────
 ipcMain.handle('check-for-updates', () => {
+  updateCheckUserInitiated = true;
   if (updaterInstance) {
     updaterInstance.checkForUpdates().catch(() => {});
   } else {
@@ -1526,7 +1540,8 @@ ipcMain.handle('show-context-menu', (event) => {
           // Start download
           if (updaterInstance) updaterInstance.downloadUpdate().catch(() => {});
         } else {
-          // Check for updates
+          // Check for updates (user-initiated)
+          updateCheckUserInitiated = true;
           if (updaterInstance) {
             updaterInstance.checkForUpdates().catch(() => {});
           } else {
