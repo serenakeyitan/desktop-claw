@@ -145,11 +145,14 @@ class StatsDisplay {
       return;
     }
 
-    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
 
     let timeString;
-    if (hours > 0) {
+    if (days > 0) {
+      timeString = `resets in ${days}d ${hours}h`;
+    } else if (hours > 0) {
       timeString = `resets in ${hours}h ${minutes}m`;
     } else if (minutes > 0) {
       timeString = `resets in ${minutes}m`;

@@ -484,7 +484,10 @@ function normalizeUsageData(data, defaultSource = 'manual-file') {
 
   pct = Math.max(0, Math.min(100, pct));
   const used = Number.isFinite(data.used) ? data.used : Math.round((pct / 100) * limit);
-  const resetAt = data.reset_at || data.resetAt || null;
+  // Use 5-hour reset_at, fall back to 7-day reset_at so countdown always has a value
+  const resetAt = data.reset_at || data.resetAt
+    || data.details?.seven_day?.resets_at
+    || null;
 
   return {
     used,
@@ -497,7 +500,8 @@ function normalizeUsageData(data, defaultSource = 'manual-file') {
     type: data.type || '5-hour',
     realData: data.realData !== undefined ? data.realData : true,
     source: data.source || defaultSource,
-    timestamp: data.timestamp || new Date().toISOString()
+    timestamp: data.timestamp || new Date().toISOString(),
+    details: data.details || null,
   };
 }
 
