@@ -59,6 +59,17 @@ class StatsDisplay {
     // Update reset time
     if (reset_at) {
       this.resetTime = new Date(reset_at);
+    } else {
+      // No active reset window — clear any stale reset time and show subscription info
+      this.resetTime = null;
+      this.countdownText.classList.remove('error', 'urgent', 'demo');
+      if (subscription) {
+        this.countdownText.textContent = subscription;
+      } else if (pct !== undefined && pct === 0) {
+        this.countdownText.textContent = '5h window clear';
+      } else {
+        this.countdownText.textContent = 'connected';
+      }
     }
 
     // Add indicators for special states
@@ -121,6 +132,7 @@ class StatsDisplay {
 
     // Calculate countdown from reset time
     if (!this.resetTime) {
+      // No reset scheduled — don't overwrite the status text set by updateTokenUsage()
       return;
     }
 
