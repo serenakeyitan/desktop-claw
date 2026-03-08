@@ -226,7 +226,10 @@ function renderRanking(data) {
     const sessions = item.log_count || 0;
     const project = item.current_project || '';
 
-    const tierLabel = { pro: 'PRO', max_100: 'MAX', max_200: 'MAX+' }[item.subscription_tier] || '';
+    const baseTierLabel = { pro: 'PRO', max_100: 'MAX', max_200: 'MAX+' }[item.subscription_tier] || '';
+    // Show "API" prefix for users connected via API key (not Claude OAuth)
+    const isApiUser = item.auth_method && item.auth_method !== 'claude-oauth' && item.auth_method !== 'claude-status';
+    const tierLabel = baseTierLabel ? (isApiUser ? `API ${baseTierLabel}` : baseTierLabel) : (isApiUser ? 'API' : '');
 
     // In ranking tabs: show "LIVE" or "last vibe Xm ago"
     const lastActive = item.last_active_at ? timeAgo(new Date(item.last_active_at)) : '';
@@ -588,6 +591,7 @@ async function buildLocalSelfRanking(period) {
     // Use locally-detected tier (from real-usage.json) over profile tier,
     // since profile tier may still be the default 'pro' before first sync
     const tier = localInfo?.subscriptionTier || profile?.subscription_tier || 'pro';
+    const authMethod = localInfo?.authMethod || profile?.auth_method || 'claude-oauth';
 
     // Get active session project names
     const sessions = localInfo?.activeSessions || [];
@@ -601,6 +605,7 @@ async function buildLocalSelfRanking(period) {
       username: profile?.username || 'You',
       display_name: profile?.display_name || profile?.username || 'You',
       subscription_tier: tier,
+      auth_method: authMethod,
       twitter_username: profile?.twitter_username || null,
       github_username: profile?.github_username || null,
       total_usage: total.totalDelta || 0,
@@ -616,15 +621,18 @@ async function buildLocalSelfRanking(period) {
     // Even on total failure, return a minimal self row.
     // Try to read the persisted tier so we don't show 'PRO' to Max users.
     let fallbackTier = 'pro';
+    let fallbackAuth = 'claude-oauth';
     try {
       const li = await window.socialAPI.getLocalInfo().catch(() => null);
       if (li?.subscriptionTier) fallbackTier = li.subscriptionTier;
+      if (li?.authMethod) fallbackAuth = li.authMethod;
     } catch { /* ignore */ }
     return [{
       user_id: 'self',
       username: 'You',
       display_name: 'You',
       subscription_tier: fallbackTier,
+      auth_method: fallbackAuth,
       total_usage: 0,
       total_time_ms: 0,
       log_count: 0,

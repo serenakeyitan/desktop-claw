@@ -27,6 +27,7 @@ class SocialSync extends EventEmitter {
     this.heartbeatTimer = null;
     this.lastSyncTimestamp = null; // ISO string of the last synced entry
     this.subscriptionTier = null;  // 'pro', 'max_100', 'max_200'
+    this.authMethod = null;        // 'claude-oauth', 'claude-status', 'api-key'
   }
 
   // ── lifecycle ──────────────────────────────────────────────────────────
@@ -137,15 +138,27 @@ class SocialSync extends EventEmitter {
     if (tier && tier !== this.subscriptionTier) {
       this.subscriptionTier = tier;
       // Sync tier to profile
-      this._syncTierToProfile(tier).catch(err =>
+      this._syncProfileFields({ subscription_tier: tier }).catch(err =>
         log.error('SocialSync: failed to sync tier', err.message));
     }
   }
 
   /**
-   * Update the user's subscription_tier in their profile row.
+   * Set the user's auth method (called from main.js on startup / auth change).
+   * @param {string} method — e.g. 'claude-oauth', 'claude-status', 'api-key'
    */
-  async _syncTierToProfile(tier) {
+  setAuthMethod(method) {
+    if (method && method !== this.authMethod) {
+      this.authMethod = method;
+      this._syncProfileFields({ auth_method: method }).catch(err =>
+        log.error('SocialSync: failed to sync auth_method', err.message));
+    }
+  }
+
+  /**
+   * Update one or more fields on the user's profile row.
+   */
+  async _syncProfileFields(fields) {
     const sb = getSupabase();
     if (!sb) return;
     const user = await getCurrentUser();
@@ -153,13 +166,13 @@ class SocialSync extends EventEmitter {
 
     const { error } = await sb
       .from('profiles')
-      .update({ subscription_tier: tier })
+      .update(fields)
       .eq('id', user.id);
 
     if (error) {
-      log.error('SocialSync: profile tier update failed', error.message);
+      log.error('SocialSync: profile update failed', error.message, JSON.stringify(fields));
     } else {
-      log(`SocialSync: subscription tier synced → ${tier}`);
+      log(`SocialSync: profile synced → ${JSON.stringify(fields)}`);
     }
   }
 

@@ -19,6 +19,10 @@ alter table public.profiles add column if not exists subscription_tier text defa
 alter table public.profiles add column if not exists twitter_username text;
 alter table public.profiles add column if not exists github_username text;
 
+-- Migration: add auth_method so rankings can show "API" vs OAuth users
+-- Values: 'claude-oauth', 'claude-status', 'api-key', etc.
+alter table public.profiles add column if not exists auth_method text default 'claude-oauth';
+
 -- Enable RLS
 alter table public.profiles enable row level security;
 
@@ -252,6 +256,7 @@ begin
         p.username,
         p.display_name,
         p.subscription_tier,
+        p.auth_method,
         p.twitter_username,
         p.github_username,
         coalesce(sum(ul.delta_percent), 0) as total_usage,
@@ -270,7 +275,7 @@ begin
          or p.id in (
            select friend_id from public.friendships where user_id = current_user_id
          )
-      group by p.id, p.username, p.display_name, p.subscription_tier, p.twitter_username, p.github_username, us.is_vibing, us.current_project, us.last_active_at
+      group by p.id, p.username, p.display_name, p.subscription_tier, p.auth_method, p.twitter_username, p.github_username, us.is_vibing, us.current_project, us.last_active_at
       order by coalesce(sum(_tokens_for_row(ul.delta_percent, ul.tier, p.subscription_tier)), 0) desc
     ) r
   );
@@ -301,6 +306,7 @@ begin
         p.username,
         p.display_name,
         p.subscription_tier,
+        p.auth_method,
         p.twitter_username,
         p.github_username,
         coalesce(sum(ul.delta_percent), 0) as total_usage,
@@ -315,7 +321,7 @@ begin
         on ul.user_id = p.id and ul.date >= cutoff
       left join public.user_status us
         on us.user_id = p.id
-      group by p.id, p.username, p.display_name, p.subscription_tier, p.twitter_username, p.github_username, us.is_vibing, us.current_project, us.last_active_at
+      group by p.id, p.username, p.display_name, p.subscription_tier, p.auth_method, p.twitter_username, p.github_username, us.is_vibing, us.current_project, us.last_active_at
       order by coalesce(sum(_tokens_for_row(ul.delta_percent, ul.tier, p.subscription_tier)), 0) desc
       limit lim
     ) r

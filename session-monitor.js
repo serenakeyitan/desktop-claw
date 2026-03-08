@@ -37,7 +37,9 @@ const log = require('./logger');
 // If a process consumes less than this many CPU-seconds per poll interval,
 // it is considered idle (waiting at the prompt). A truly idle Claude process
 // uses ~0s of CPU. An active one uses 1-4s per 5-second poll.
-const CPU_DELTA_IDLE_THRESHOLD = 0.3; // seconds of CPU per poll
+// Note: during inference, CPU may be near-zero (network I/O wait), so we also
+// check debug file growth as a supplementary activity signal.
+const CPU_DELTA_IDLE_THRESHOLD = 0.15; // seconds of CPU per poll (lowered to catch light activity)
 
 // Number of consecutive idle polls before we declare the session idle.
 // With 5s polling this means 30s of sustained idle before "task finished".
@@ -47,8 +49,9 @@ const IDLE_CONFIRM_POLLS = 6;
 const MIN_BUSY_DURATION_MS = 30 * 1000; // 30 seconds
 
 // Debug files modified more recently than this are considered active sessions.
-// Set to 2 minutes to be generous — active sessions write debug output frequently.
-const FRESHNESS_THRESHOLD_SEC = 120;
+// Set to 5 minutes — during long inference runs, debug file writes can be
+// infrequent (especially for streaming responses that only log at the end).
+const FRESHNESS_THRESHOLD_SEC = 300;
 
 // Number of consecutive polls where a session is "missing" before we remove it.
 // With 5s polling this means ~60s of sustained absence before removal.
@@ -493,6 +496,11 @@ class SessionMonitor extends EventEmitter {
           busyPolls: 0, // consecutive busy polls — need several before transitions count
           busySince: sess.remote ? new Date() : null,
           missingPolls: 0, // consecutive polls where this session wasn't found
+          // Track debug file metadata for growth-based activity detection.
+          // During inference, CPU is near-zero (network I/O), but the debug
+          // file keeps growing as Claude streams its response.
+          lastMtime: sess.mtime || null,
+          lastFileSize: sess.fileSize || 0,
         };
         this.sessions.set(sess.id, session);
 
@@ -502,7 +510,7 @@ class SessionMonitor extends EventEmitter {
         log(`Session detected: ${sess.project || sess.id}${elapsed}`);
         this.emit('session-started', { ...session, status: 'unknown' });
       } else {
-        // Existing session — update and track CPU delta
+        // Existing session — update and track CPU delta + file growth
         const existing = this.sessions.get(sess.id);
         // Reset missing counter — session is present this poll
         existing.missingPolls = 0;
@@ -512,15 +520,35 @@ class SessionMonitor extends EventEmitter {
         if (sess.project) existing.project = sess.project;
         if (sess.pid) existing.pid = sess.pid;
 
-        // CPU time delta for busy/idle detection (only if we have process info)
+        // ── Debug file growth detection ─────────────────────────────
+        // During inference, Claude Code streams responses but uses almost
+        // no CPU (blocked on network I/O). The debug file still grows,
+        // so file size or mtime changes are a reliable activity signal.
+        let debugFileActive = false;
+        if (sess.mtime && existing.lastMtime) {
+          if (sess.mtime !== existing.lastMtime || (sess.fileSize || 0) !== existing.lastFileSize) {
+            debugFileActive = true;
+          }
+        }
+        if (sess.mtime) existing.lastMtime = sess.mtime;
+        if (sess.fileSize !== undefined) existing.lastFileSize = sess.fileSize;
+
+        // ── CPU time delta for busy/idle detection ──────────────────
         // Skip for remote sessions — we can't track their CPU usage
-        if (sess.cpuTimeSec > 0 && !existing.remote) {
-          const cpuDelta = sess.cpuTimeSec - existing.lastCpuTimeSec;
+        const hasCpuInfo = sess.cpuTimeSec > 0 && !existing.remote;
+        let cpuDelta = 0;
+        if (hasCpuInfo) {
+          cpuDelta = sess.cpuTimeSec - existing.lastCpuTimeSec;
           existing.lastCpuTimeSec = sess.cpuTimeSec;
           existing.cpuDelta = cpuDelta;
+        }
 
+        // Session is active if EITHER CPU is above threshold OR the debug
+        // file grew since last poll. This catches inference (low CPU, high I/O).
+        if (hasCpuInfo || debugFileActive) {
           const wasActive = existing.busy;
-          const isIdle = cpuDelta < CPU_DELTA_IDLE_THRESHOLD;
+          const cpuActive = hasCpuInfo && cpuDelta >= CPU_DELTA_IDLE_THRESHOLD;
+          const isIdle = !cpuActive && !debugFileActive;
 
           if (isIdle) {
             existing.idlePolls = (existing.idlePolls || 0) + 1;
@@ -530,10 +558,9 @@ class SessionMonitor extends EventEmitter {
             existing.busyPolls = (existing.busyPolls || 0) + 1;
           }
 
-          // Require at least 3 consecutive busy polls before marking as busy.
-          // This prevents single-poll CPU spikes from triggering a false
-          // busy→idle notification cycle.
-          const BUSY_CONFIRM_POLLS = 3;
+          // Require at least 2 consecutive busy polls before marking as busy.
+          // This prevents single-poll spikes from triggering a false cycle.
+          const BUSY_CONFIRM_POLLS = 2;
 
           if (wasActive && existing.idlePolls >= IDLE_CONFIRM_POLLS) {
             // Transition: busy -> idle (task finished)
@@ -585,12 +612,13 @@ class SessionMonitor extends EventEmitter {
               log(`Session idle: ${existing.project || existing.id} (busy only ${busyDuration}, skipping notification)`);
             }
           } else if (!wasActive && !isIdle && existing.busyPolls >= BUSY_CONFIRM_POLLS) {
-            // Transition: idle -> busy (task started) — confirmed by sustained CPU usage
+            // Transition: idle -> busy (task started) — confirmed by sustained CPU or file growth
             existing.busy = true;
             existing.idlePolls = 0;
             existing.busySince = new Date();
 
-            log(`Session task started: ${existing.project || existing.id} (CPU delta ${cpuDelta.toFixed(1)}s)`);
+            const reason = debugFileActive ? 'debug file growing' : `CPU delta ${cpuDelta.toFixed(1)}s`;
+            log(`Session task started: ${existing.project || existing.id} (${reason})`);
             this.emit('session-task-started', {
               id: existing.id,
               pid: existing.pid,

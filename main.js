@@ -391,30 +391,19 @@ function createMainWindow() {
 
   // Once the renderer has fully loaded (IPC listeners registered), push any
   // cached usage data so the bubble doesn't stay stuck on "loading...".
-  // Without this, the first token-update from initializeServices() fires
-  // before the renderer is ready and gets lost.
+  //
+  // did-finish-load fires before initializeServices() creates the tracker,
+  // so we first try the saved file on disk.  If that's empty we schedule a
+  // deferred push that fires after the tracker has had time to fetch data.
   mainWindow.webContents.on('did-finish-load', () => {
-    // 1. Try the in-memory tracker data (most recent)
-    if (autoUsageUpdater && autoUsageUpdater.claudeTracker) {
-      const cached = autoUsageUpdater.claudeTracker.getUsageData();
-      if (cached && cached.percentage !== undefined) {
-        const normalized = normalizeUsageData(cached, 'claude-status');
-        if (normalized && mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('token-update', normalized);
-        }
-        return; // sent — done
-      }
-    }
-
-    // 2. Fall back to the saved usage file
-    const manualUsage = checkManualUsageFile();
-    if (manualUsage && mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('token-update', manualUsage);
-    }
+    _pushCachedUsageToRenderer();
   });
 
-  // Initialize services
-  initializeServices();
+  // Initialize services, then push data again once the tracker is alive.
+  // This guarantees the renderer gets data regardless of timing.
+  initializeServices().then(() => {
+    _pushCachedUsageToRenderer();
+  }).catch(() => {});
 
   // Handle window close
   mainWindow.on('closed', () => {
@@ -444,6 +433,33 @@ function _lastKnownSubscriptionLabel() {
     if (tier) return 'Claude Pro';
   } catch { /* ignore */ }
   return 'Claude Pro';
+}
+
+/**
+ * Push the best available usage data to the renderer.
+ * Tries, in order: in-memory tracker cache, saved file on disk.
+ * Safe to call multiple times (idempotent — renderer just overwrites).
+ */
+function _pushCachedUsageToRenderer() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+
+  // 1. In-memory tracker (most recent, only exists after initializeServices)
+  if (autoUsageUpdater && autoUsageUpdater.claudeTracker) {
+    const cached = autoUsageUpdater.claudeTracker.getUsageData();
+    if (cached && cached.percentage !== undefined) {
+      const normalized = normalizeUsageData(cached, 'claude-status');
+      if (normalized) {
+        mainWindow.webContents.send('token-update', normalized);
+        return;
+      }
+    }
+  }
+
+  // 2. Saved usage file on disk
+  const manualUsage = checkManualUsageFile();
+  if (manualUsage) {
+    mainWindow.webContents.send('token-update', manualUsage);
+  }
 }
 
 // Check for manual usage file
@@ -1205,6 +1221,13 @@ async function startSocialSync() {
   socialSync = new SocialSync(usageDB);
   await socialSync.start();
   startPokePolling();
+
+  // Sync the auth method so rankings can show "API" prefix for API users
+  const cfg = loadConfig();
+  if (cfg.authType) {
+    socialSync.setAuthMethod(cfg.authType);
+  }
+
   log('Social sync started');
 
   // If session monitor is active, feed vibing status
@@ -1388,7 +1411,11 @@ ipcMain.handle('social-get-local-info', () => {
   // Start with the persisted tier from config (survives disconnections),
   // then override with the more recent value from real-usage.json if available.
   const cfg = loadConfig();
-  const info = { subscriptionTier: cfg.lastKnownTier || 'pro', activeSessions: [] };
+  const info = {
+    subscriptionTier: cfg.lastKnownTier || 'pro',
+    authMethod: cfg.authType || 'claude-oauth',
+    activeSessions: [],
+  };
 
   // Read tier from saved usage data (may be more recent than config)
   try {
