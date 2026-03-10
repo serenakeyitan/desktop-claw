@@ -486,7 +486,10 @@ function normalizeUsageData(data, defaultSource = 'manual-file') {
     pct = data.percentage;
   }
   if (pct === undefined && Number.isFinite(data.used) && limit > 0) {
-    pct = Math.round((data.used / limit) * 100);
+    const raw = (data.used / limit) * 100;
+    pct = raw > 0 && raw < 1
+      ? Math.max(0.1, Math.round(raw * 10) / 10)
+      : Math.round(raw);
   }
   if (!Number.isFinite(pct)) {
     pct = 0;
@@ -635,7 +638,10 @@ async function initializeServices() {
         // Pass the subscription tier so token counts are computed correctly
         // even if the user later switches plans.
         if (usageDB && sessionMonitor) {
-          const currentPct = data.percentage ?? data.pct ?? null;
+          // Use the raw utilization from the API details for delta tracking
+          // so tiny increments aren't lost to display rounding.
+          const currentPct = data.details?.five_hour?.utilization
+            ?? data.percentage ?? data.pct ?? null;
           const tier = data.subscriptionTier || loadConfig().lastKnownTier || 'pro';
 
           if (currentPct !== null && lastUsagePct === null && currentPct > 0) {
@@ -686,7 +692,7 @@ async function initializeServices() {
               }
             }
           }
-          lastUsagePct = data.percentage ?? data.pct ?? lastUsagePct;
+          lastUsagePct = currentPct ?? lastUsagePct;
 
           // Persist snapshot so on next restart we know how much was already tracked
           if (currentPct !== null) {

@@ -245,11 +245,24 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
     const tier = this.getSubscriptionTier();
     const tierLabels = { pro: 'Claude Pro', max_100: 'Claude Max', max_200: 'Claude Max ($200)' };
 
+    // Never round down to 0% when there IS usage — ceiling at 0.1% minimum.
+    // On large-budget tiers (Max: 45M tokens), normal usage can be < 0.1%
+    // which Math.round() would silently kill.
+    let roundedPct;
+    if (primaryUtilization <= 0) {
+      roundedPct = 0;
+    } else if (primaryUtilization < 1) {
+      // Show one decimal, but floor to at least 0.1 so it's never hidden
+      roundedPct = Math.max(0.1, Math.round(primaryUtilization * 10) / 10);
+    } else {
+      roundedPct = Math.round(primaryUtilization);
+    }
+
     return {
       // Primary usage (5-hour window)
-      percentage: Math.round(primaryUtilization),
-      pct: Math.round(primaryUtilization),
-      used: Math.round(primaryUtilization),
+      percentage: roundedPct,
+      pct: roundedPct,
+      used: roundedPct,
       limit: 100,
       resetAt: primaryResetAt,
       reset_at: primaryResetAt,
