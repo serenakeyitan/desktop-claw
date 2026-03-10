@@ -120,6 +120,30 @@ class UsageDB {
   }
 
   /**
+   * Save a snapshot of the last polled usage percentage so that on app restart
+   * we can compute how much new usage occurred while the app was closed.
+   *
+   * @param {number} pct      - Current usage percentage (0-100)
+   * @param {string} resetAt  - ISO timestamp of the current window's reset time
+   */
+  saveLastPollSnapshot(pct, resetAt) {
+    this.data.lastPollSnapshot = {
+      pct: Math.round(pct * 100) / 100,
+      resetAt: resetAt || null,
+      timestamp: new Date().toISOString(),
+    };
+    this.save();
+  }
+
+  /**
+   * Retrieve the last poll snapshot saved before the app was closed / restarted.
+   * Returns null if no snapshot exists.
+   */
+  getLastPollSnapshot() {
+    return this.data.lastPollSnapshot || null;
+  }
+
+  /**
    * Convert a percentage delta to an estimated token count using the tier's budget.
    *
    * @param {number} deltaPercent - Usage percentage points (e.g. 2.5 means 2.5%)

@@ -21,12 +21,8 @@ class StatsDisplay {
 
     // Update percentage display
     if (pct !== undefined) {
-      // Show subscription type if available
       let displayText = `${pct}%`;
-      if (subscription) {
-        displayText = `${pct}% (${subscription})`;
-      } else if (type === 'messages') {
-        // For Claude subscriptions, show as messages
+      if (type === 'messages') {
         displayText = `${used}/${limit} msgs`;
       }
       this.tokenPercentage.textContent = displayText;
@@ -60,12 +56,10 @@ class StatsDisplay {
     if (reset_at) {
       this.resetTime = new Date(reset_at);
     } else {
-      // No active reset window — clear any stale reset time and show subscription info
+      // No active reset window — usage hasn't started or window is clear
       this.resetTime = null;
       this.countdownText.classList.remove('error', 'urgent', 'demo');
-      if (subscription) {
-        this.countdownText.textContent = subscription;
-      } else if (pct !== undefined && pct === 0) {
+      if (pct !== undefined && pct === 0) {
         this.countdownText.textContent = '5h window clear';
       } else {
         this.countdownText.textContent = 'connected';

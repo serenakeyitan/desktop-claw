@@ -329,7 +329,17 @@ function createMainWindow() {
 
   // Calculate default position (bottom-right with 20px margin)
   const windowWidth = 180;
-  const windowHeight = 240;
+  const windowHeight = 360;
+  const oldWindowHeight = 240;
+
+  // Migrate saved position from old 240px window to new 360px window
+  // so the robot stays at the same visual screen position
+  if (config.position.y !== null && !config._windowHeightMigrated) {
+    config.position.y -= (windowHeight - oldWindowHeight);
+    config._windowHeightMigrated = true;
+    saveConfig(config);
+  }
+
   let x = config.position.x !== null ? config.position.x : screenWidth - windowWidth - 20;
   let y = config.position.y !== null ? config.position.y : screenHeight - windowHeight - 20;
 
@@ -627,7 +637,33 @@ async function initializeServices() {
         if (usageDB && sessionMonitor) {
           const currentPct = data.percentage ?? data.pct ?? null;
           const tier = data.subscriptionTier || loadConfig().lastKnownTier || 'pro';
-          if (currentPct !== null && lastUsagePct !== null) {
+
+          if (currentPct !== null && lastUsagePct === null && currentPct > 0) {
+            // First poll after app (re)start and user already has usage in this
+            // window. Record the usage that occurred while the app was closed so
+            // it shows up in rankings — otherwise users would show 0 tokens.
+            const resetAt = data.resetAt || data.reset_at || null;
+            const snapshot = usageDB.getLastPollSnapshot();
+            let baseline = currentPct;
+
+            if (snapshot) {
+              // Same 5-hour window (reset time hasn't changed) → only record
+              // the increase since the last snapshot to avoid double-counting.
+              const sameWindow = snapshot.resetAt && resetAt
+                && snapshot.resetAt === resetAt;
+              if (sameWindow && snapshot.pct > 0) {
+                baseline = Math.max(0, currentPct - snapshot.pct);
+              }
+              // If the window has reset (different resetAt), the full
+              // currentPct is genuinely new usage — record all of it.
+            }
+
+            if (baseline > 0) {
+              usageDB.recordUsage('(baseline)', baseline, 0, tier);
+              log(`Usage baseline: ${baseline.toFixed(1)}% (${tier}) recorded on startup`
+                + (baseline < currentPct ? ` (${currentPct.toFixed(1)}% total, ${(currentPct - baseline).toFixed(1)}% already tracked)` : ''));
+            }
+          } else if (currentPct !== null && lastUsagePct !== null) {
             const delta = currentPct - lastUsagePct;
             if (delta > 0) {
               // Get currently busy sessions
@@ -651,6 +687,18 @@ async function initializeServices() {
             }
           }
           lastUsagePct = data.percentage ?? data.pct ?? lastUsagePct;
+
+          // Persist snapshot so on next restart we know how much was already tracked
+          if (currentPct !== null) {
+            const resetAt = data.resetAt || data.reset_at || null;
+            usageDB.saveLastPollSnapshot(currentPct, resetAt);
+          }
+
+          // Eagerly push new usage to Supabase so rankings update quickly
+          // instead of waiting for the next 2-minute periodic sync.
+          if (socialSync) {
+            socialSync.syncUsage().catch(() => {});
+          }
         }
       });
     } catch (error) {
