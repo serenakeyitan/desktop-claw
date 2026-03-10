@@ -640,8 +640,13 @@ async function initializeServices() {
         if (usageDB && sessionMonitor) {
           // Use the raw utilization from the API details for delta tracking
           // so tiny increments aren't lost to display rounding.
-          const currentPct = data.details?.five_hour?.utilization
-            ?? data.percentage ?? data.pct ?? null;
+          // Mirror the window selection in normalizeUsageData: prefer 5-hour,
+          // but fall back to 7-day when 5-hour is 0 and 7-day has usage.
+          const fiveHrRaw  = data.details?.five_hour?.utilization  ?? 0;
+          const sevenDRaw  = data.details?.seven_day?.utilization  ?? 0;
+          const currentPct = (fiveHrRaw > 0 || sevenDRaw === 0)
+            ? (fiveHrRaw || data.percentage || data.pct || null)
+            : (sevenDRaw || data.percentage || data.pct || null);
           const tier = data.subscriptionTier || loadConfig().lastKnownTier || 'pro';
 
           if (currentPct !== null && lastUsagePct === null && currentPct > 0) {

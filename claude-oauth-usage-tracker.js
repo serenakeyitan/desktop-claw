@@ -237,9 +237,25 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
     const sevenDayOpus = apiData.seven_day_opus;
     const sevenDaySonnet = apiData.seven_day_sonnet;
 
-    // Use five_hour as the primary usage indicator (most relevant for active usage)
-    const primaryUtilization = fiveHour?.utilization ?? 0;
-    const primaryResetAt = fiveHour?.resets_at ?? null;
+    // Pick the window with the highest utilization as the primary display.
+    // The 5-hour window is preferred, but if it reads 0 while 7-day has
+    // real usage the user would see a misleading 0%.  In that case fall
+    // back to the 7-day window so something meaningful is always shown.
+    const fiveHourUtil  = fiveHour?.utilization  ?? 0;
+    const sevenDayUtil  = sevenDay?.utilization  ?? 0;
+
+    let primaryUtilization, primaryResetAt, primaryType;
+    if (fiveHourUtil > 0 || sevenDayUtil === 0) {
+      // Normal case — 5-hour has usage, or both are 0
+      primaryUtilization = fiveHourUtil;
+      primaryResetAt = fiveHour?.resets_at ?? null;
+      primaryType = '5-hour';
+    } else {
+      // 5-hour is 0 but 7-day has usage — show 7-day instead
+      primaryUtilization = sevenDayUtil;
+      primaryResetAt = sevenDay?.resets_at ?? null;
+      primaryType = '7-day';
+    }
 
     // Read actual subscription tier from keychain
     const tier = this.getSubscriptionTier();
@@ -259,7 +275,7 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
     }
 
     return {
-      // Primary usage (5-hour window)
+      // Primary usage — whichever window is most informative
       percentage: roundedPct,
       pct: roundedPct,
       used: roundedPct,
@@ -268,7 +284,7 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
       reset_at: primaryResetAt,
       subscription: tierLabels[tier] || 'Claude Pro',
       subscriptionTier: tier,
-      type: '5-hour',
+      type: primaryType,
       realData: true,
       source: 'claude-oauth-api',
       timestamp: new Date().toISOString(),
@@ -369,6 +385,7 @@ class ClaudeOAuthUsageTracker extends EventEmitter {
       log(
         `Claude usage updated: 5h=${normalized.details.five_hour?.utilization ?? 'N/A'}%` +
         ` | 7d=${normalized.details.seven_day?.utilization ?? 'N/A'}%` +
+        ` | showing=${normalized.type} (${normalized.pct}%)` +
         ` | resets=${normalized.reset_at ?? 'unknown'}`
       );
 

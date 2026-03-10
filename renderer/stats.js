@@ -60,7 +60,7 @@ class StatsDisplay {
       this.resetTime = null;
       this.countdownText.classList.remove('error', 'urgent', 'demo');
       if (pct !== undefined && pct === 0) {
-        this.countdownText.textContent = '5h window clear';
+        this.countdownText.textContent = type === '7-day' ? '7d window clear' : '5h window clear';
       } else {
         this.countdownText.textContent = 'connected';
       }
