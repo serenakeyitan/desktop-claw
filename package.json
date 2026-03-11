@@ -1,6 +1,6 @@
 {
   "name": "alldaypoke",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "A minimalist desktop widget showing Claude API usage with animated robot",
   "main": "main.js",
   "scripts": {
@@ -58,6 +58,7 @@
       "supabase-client.js",
       "usage-db.js",
       "usage-tracker.js",
+      "jsonl-token-scanner.js",
       "logger.js",
       "social-backend.js",
       "alldaypoke",

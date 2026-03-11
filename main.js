@@ -48,6 +48,7 @@ const SessionMonitor = require('./session-monitor');
 const UsageDB = require('./usage-db');
 const supabaseClient = require('./supabase-client');
 const SocialSync = require('./social-sync');
+const JsonlTokenScanner = require('./jsonl-token-scanner');
 const { getClaudeBinaryPath } = require('./claude-path');
 const log = require('./logger');
 
@@ -202,6 +203,7 @@ let rankingWindow;
 let loginWindow;
 let socialWindow;
 let socialSync;
+let jsonlScanner;
 let lastUsagePct = null;  // tracks last OAuth utilization for delta computation
 let pendingInviteCode = null;  // queued invite code from deep link, processed after login
 let pendingWindowAfterLogin = null;  // window to open after login completes ('social')
@@ -406,6 +408,23 @@ function createMainWindow() {
   // so we first try the saved file on disk.  If that's empty we schedule a
   // deferred push that fires after the tracker has had time to fetch data.
   mainWindow.webContents.on('did-finish-load', () => {
+    // Re-apply click-through with forwarding on every load (including reloads).
+    // Without this the renderer never receives mousemove events over transparent
+    // areas after a reload, making the robot un-hoverable / invisible.
+    mainWindow.setIgnoreMouseEvents(true, { forward: true });
+
+    // Force macOS to re-composite the transparent window after a reload.
+    // Without this nudge the window often renders completely blank on macOS
+    // because the compositor doesn't know the content changed.
+    const [cx, cy] = mainWindow.getPosition();
+    mainWindow.setPosition(cx + 1, cy);
+    setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.setPosition(cx, cy);
+        mainWindow.webContents.invalidate();
+      }
+    }, 50);
+
     _pushCachedUsageToRenderer();
   });
 
@@ -854,6 +873,42 @@ async function initializeServices() {
     log.error('Failed to start session monitor:', error);
   }
 
+  // Start JSONL token scanner — reads Claude Code conversation files to track
+  // actual token usage for ALL users (OAuth and API key).
+  //
+  // For OAuth users: the percentage-based tracker above already records usage
+  // via the API. The JSONL scanner still runs (to maintain cursor state) but
+  // only records tokens into the DB for non-OAuth users to avoid double-counting.
+  try {
+    if (!jsonlScanner) {
+      const isOAuthUser = config.authType === 'claude-oauth' || config.authType === 'claude-status';
+      jsonlScanner = new JsonlTokenScanner({ pollIntervalSeconds: 30 });
+
+      jsonlScanner.on('tokens', (data) => {
+        // Only record JSONL tokens for non-OAuth users.
+        // OAuth users already have percentage-based tracking from the API.
+        if (isOAuthUser) return;
+
+        if (usageDB && data.totalTokens > 0) {
+          usageDB.recordTokenUsage(data.project, data.totalTokens, 0);
+          log(`JSONL tokens recorded: ${data.totalTokens.toLocaleString()} for ${data.project}`);
+
+          // Eagerly push to Supabase so friend rankings update quickly
+          if (socialSync) {
+            socialSync.syncUsage().catch(() => {});
+          }
+        }
+      });
+
+      jsonlScanner.start();
+      if (isOAuthUser) {
+        log('JSONL scanner: running in cursor-only mode (OAuth user, tokens tracked via API)');
+      }
+    }
+  } catch (error) {
+    log.error('Failed to start JSONL token scanner:', error);
+  }
+
   // Try to restore a previous Supabase social session
   try {
     const restoredUser = await supabaseClient.restoreSession();
@@ -887,6 +942,10 @@ function cleanupServices() {
   if (sessionMonitor) {
     sessionMonitor.stop();
     sessionMonitor = null;
+  }
+  if (jsonlScanner) {
+    jsonlScanner.stop();
+    jsonlScanner = null;
   }
   stopPokePolling();
   if (socialSync) {
@@ -1589,6 +1648,7 @@ ipcMain.handle('show-context-menu', (event) => {
         }
 
         // Reload the renderer UI
+        // (did-finish-load handler re-applies setIgnoreMouseEvents automatically)
         mainWindow.reload();
       }
     },

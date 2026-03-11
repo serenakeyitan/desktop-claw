@@ -375,6 +375,18 @@ function setupUpdateListener() {
   const updateBtn = document.getElementById('update-btn');
   const dismissBtn = document.getElementById('update-dismiss');
 
+  // Show/hide helpers that also toggle click-through so buttons are always
+  // clickable even if the popup appears under the cursor (no mousemove fires).
+  function showPopup() {
+    popup.classList.remove('hidden');
+    window.electronAPI.setIgnoreMouseEvents(false);
+  }
+  function hidePopup() {
+    popup.classList.add('hidden');
+    // Let the normal mousemove handler decide; force click-through for now
+    window.electronAPI.setIgnoreMouseEvents(true);
+  }
+
   window.electronAPI.onUpdateStatus((data) => {
     switch (data.status) {
       case 'checking':
@@ -386,7 +398,7 @@ function setupUpdateListener() {
         updateBtn.disabled = true;
         updateBtn.className = '';
         dismissBtn.style.display = 'none';
-        popup.classList.remove('hidden');
+        showPopup();
         break;
 
       case 'available':
@@ -398,7 +410,7 @@ function setupUpdateListener() {
         updateBtn.className = '';
         updateBtn.disabled = false;
         dismissBtn.style.display = '';
-        popup.classList.remove('hidden');
+        showPopup();
         break;
 
       case 'downloading':
@@ -408,7 +420,7 @@ function setupUpdateListener() {
         updateBtn.textContent = `${data.progress}%`;
         updateBtn.disabled = true;
         dismissBtn.style.display = 'none';
-        popup.classList.remove('hidden');
+        showPopup();
         break;
 
       case 'downloaded':
@@ -418,7 +430,7 @@ function setupUpdateListener() {
         updateBtn.className = 'restart';
         updateBtn.disabled = false;
         dismissBtn.style.display = 'none';
-        popup.classList.remove('hidden');
+        showPopup();
         break;
 
       case 'not-available':
@@ -430,11 +442,11 @@ function setupUpdateListener() {
         updateBtn.className = '';
         updateBtn.disabled = false;
         dismissBtn.style.display = 'none';
-        popup.classList.remove('hidden');
+        showPopup();
         // Auto-dismiss after 3 seconds
         if (upToDateTimer) clearTimeout(upToDateTimer);
         upToDateTimer = setTimeout(() => {
-          popup.classList.add('hidden');
+          hidePopup();
         }, 3000);
         break;
 
@@ -446,12 +458,12 @@ function setupUpdateListener() {
         updateBtn.className = '';
         updateBtn.disabled = false;
         dismissBtn.style.display = '';
-        popup.classList.remove('hidden');
+        showPopup();
         break;
 
       case 'idle':
         if (!popup.classList.contains('hidden')) {
-          popup.classList.add('hidden');
+          hidePopup();
         }
         break;
     }
@@ -465,7 +477,7 @@ function setupUpdateListener() {
     } else if (label === 'Update') {
       window.electronAPI.downloadUpdate();
     } else if (label === 'OK') {
-      popup.classList.add('hidden');
+      hidePopup();
     } else if (label === 'Retry') {
       window.electronAPI.checkForUpdates();
     }
@@ -474,7 +486,7 @@ function setupUpdateListener() {
   dismissBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     updatePopupDismissed = true;
-    popup.classList.add('hidden');
+    hidePopup();
   });
 }
 

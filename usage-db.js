@@ -188,6 +188,46 @@ class UsageDB {
   }
 
   /**
+   * Record a usage entry from raw token counts (e.g. from JSONL scanner).
+   *
+   * Converts raw tokens to an equivalent percentage using the 'pro' tier budget
+   * so the entry flows through the existing ranking and Supabase sync pipeline.
+   * The actual token count is preserved in a `rawTokens` field for accurate display.
+   *
+   * @param {string} project      - Project/directory name
+   * @param {number} tokens       - Total tokens consumed (input + output + cache)
+   * @param {number} activeTimeMs - Milliseconds of active time
+   */
+  recordTokenUsage(project, tokens, activeTimeMs = 0) {
+    if (!project || tokens <= 0) return;
+
+    // Convert raw tokens to a percentage relative to the 'pro' tier budget.
+    // This lets the existing ranking, sync, and compaction code work unchanged.
+    const proLimit = TIER_TOKEN_LIMITS['pro'];
+    const deltaPercent = (tokens / proLimit) * 100;
+
+    const now = new Date();
+    const date = this.dateKey(now);
+
+    this.data.entries.push({
+      project,
+      timestamp: now.toISOString(),
+      date,
+      deltaPercent: Math.round(deltaPercent * 1000) / 1000, // 3 decimal places for precision
+      activeTimeMs: Math.round(activeTimeMs),
+      tier: 'pro',        // use 'pro' tier so percentToTokens() reverses correctly
+      rawTokens: tokens,  // preserve actual count for local display
+      source: 'jsonl',    // tag so we can distinguish from OAuth-derived entries
+    });
+
+    this.save();
+
+    if (this.data.entries.length % 100 === 0) {
+      this.compact();
+    }
+  }
+
+  /**
    * Get usage ranking for a time period.
    *
    * Returns token counts computed from each entry's stored tier so that plan
