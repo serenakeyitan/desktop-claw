@@ -656,11 +656,12 @@ async function initializeServices() {
         // Attribution: compute delta and assign to busy sessions.
         // Pass the subscription tier so token counts are computed correctly
         // even if the user later switches plans.
+        //
+        // When the JSONL scanner is active it provides exact per-project
+        // token counts, so we skip percentage-based recording to avoid
+        // double-counting.  We still track lastUsagePct and snapshots
+        // so the robot's percentage display stays correct.
         if (usageDB && sessionMonitor) {
-          // Use the raw utilization from the API details for delta tracking
-          // so tiny increments aren't lost to display rounding.
-          // Mirror the window selection in normalizeUsageData: prefer 5-hour,
-          // but fall back to 7-day when 5-hour is 0 and 7-day has usage.
           const fiveHrRaw  = data.details?.five_hour?.utilization  ?? 0;
           const sevenDRaw  = data.details?.seven_day?.utilization  ?? 0;
           const currentPct = (fiveHrRaw > 0 || sevenDRaw === 0)
@@ -668,54 +669,49 @@ async function initializeServices() {
             : (sevenDRaw || data.percentage || data.pct || null);
           const tier = data.subscriptionTier || loadConfig().lastKnownTier || 'pro';
 
-          if (currentPct !== null && lastUsagePct === null && currentPct > 0) {
-            // First poll after app (re)start and user already has usage in this
-            // window. Record the usage that occurred while the app was closed so
-            // it shows up in rankings — otherwise users would show 0 tokens.
-            const resetAt = data.resetAt || data.reset_at || null;
-            const snapshot = usageDB.getLastPollSnapshot();
-            let baseline = currentPct;
+          // Only record percentage-based usage when JSONL scanner is NOT
+          // active. The JSONL scanner reads exact token counts from
+          // conversation files, which is strictly more accurate.
+          if (!jsonlScanner) {
+            if (currentPct !== null && lastUsagePct === null && currentPct > 0) {
+              const resetAt = data.resetAt || data.reset_at || null;
+              const snapshot = usageDB.getLastPollSnapshot();
+              let baseline = currentPct;
 
-            if (snapshot) {
-              // Same 5-hour window (reset time hasn't changed) → only record
-              // the increase since the last snapshot to avoid double-counting.
-              const sameWindow = snapshot.resetAt && resetAt
-                && snapshot.resetAt === resetAt;
-              if (sameWindow && snapshot.pct > 0) {
-                baseline = Math.max(0, currentPct - snapshot.pct);
-              }
-              // If the window has reset (different resetAt), the full
-              // currentPct is genuinely new usage — record all of it.
-            }
-
-            if (baseline > 0) {
-              usageDB.recordUsage('(baseline)', baseline, 0, tier);
-              log(`Usage baseline: ${baseline.toFixed(1)}% (${tier}) recorded on startup`
-                + (baseline < currentPct ? ` (${currentPct.toFixed(1)}% total, ${(currentPct - baseline).toFixed(1)}% already tracked)` : ''));
-            }
-          } else if (currentPct !== null && lastUsagePct !== null) {
-            const delta = currentPct - lastUsagePct;
-            if (delta > 0) {
-              // Get currently busy sessions
-              const sessions = sessionMonitor.getSessions();
-              const busySessions = sessions.filter(s => s.busy);
-
-              if (busySessions.length > 0) {
-                // Split delta equally among busy sessions
-                const perSession = delta / busySessions.length;
-                for (const s of busySessions) {
-                  const project = s.project || (s.cwd ? require('path').basename(s.cwd) : 'session');
-                  // Estimate active time as the full poll interval (60s)
-                  usageDB.recordUsage(project, perSession, 60000, tier);
+              if (snapshot) {
+                const sameWindow = snapshot.resetAt && resetAt
+                  && snapshot.resetAt === resetAt;
+                if (sameWindow && snapshot.pct > 0) {
+                  baseline = Math.max(0, currentPct - snapshot.pct);
                 }
-                log(`Usage attributed: +${delta.toFixed(1)}% (${tier}) to ${busySessions.map(s => s.project).join(', ')}`);
-              } else {
-                // No busy sessions — attribute to "other" (web usage, etc.)
-                usageDB.recordUsage('(other)', delta, 0, tier);
-                log(`Usage attributed: +${delta.toFixed(1)}% (${tier}) to (other) — no active sessions`);
+              }
+
+              if (baseline > 0) {
+                usageDB.recordUsage('(baseline)', baseline, 0, tier);
+                log(`Usage baseline: ${baseline.toFixed(1)}% (${tier}) recorded on startup`
+                  + (baseline < currentPct ? ` (${currentPct.toFixed(1)}% total, ${(currentPct - baseline).toFixed(1)}% already tracked)` : ''));
+              }
+            } else if (currentPct !== null && lastUsagePct !== null) {
+              const delta = currentPct - lastUsagePct;
+              if (delta > 0) {
+                const sessions = sessionMonitor.getSessions();
+                const busySessions = sessions.filter(s => s.busy);
+
+                if (busySessions.length > 0) {
+                  const perSession = delta / busySessions.length;
+                  for (const s of busySessions) {
+                    const project = s.project || (s.cwd ? require('path').basename(s.cwd) : 'session');
+                    usageDB.recordUsage(project, perSession, 60000, tier);
+                  }
+                  log(`Usage attributed: +${delta.toFixed(1)}% (${tier}) to ${busySessions.map(s => s.project).join(', ')}`);
+                } else {
+                  usageDB.recordUsage('(other)', delta, 0, tier);
+                  log(`Usage attributed: +${delta.toFixed(1)}% (${tier}) to (other) — no active sessions`);
+                }
               }
             }
           }
+
           lastUsagePct = currentPct ?? lastUsagePct;
 
           // Persist snapshot so on next restart we know how much was already tracked
@@ -874,21 +870,18 @@ async function initializeServices() {
   }
 
   // Start JSONL token scanner — reads Claude Code conversation files to track
-  // actual token usage for ALL users (OAuth and API key).
+  // actual token usage for ALL users (OAuth and API key alike).
   //
-  // For OAuth users: the percentage-based tracker above already records usage
-  // via the API. The JSONL scanner still runs (to maintain cursor state) but
-  // only records tokens into the DB for non-OAuth users to avoid double-counting.
+  // The JSONL scanner provides exact per-project token counts from conversation
+  // files, which is more accurate than the OAuth percentage-based tracking.
+  // It records tokens for everyone; the percentage-based tracker in the
+  // 'usage-updated' handler above is now skipped when the JSONL scanner is
+  // active (see `jsonlScanner` guard there) to avoid double-counting.
   try {
     if (!jsonlScanner) {
-      const isOAuthUser = config.authType === 'claude-oauth' || config.authType === 'claude-status';
       jsonlScanner = new JsonlTokenScanner({ pollIntervalSeconds: 30 });
 
       jsonlScanner.on('tokens', (data) => {
-        // Only record JSONL tokens for non-OAuth users.
-        // OAuth users already have percentage-based tracking from the API.
-        if (isOAuthUser) return;
-
         if (usageDB && data.totalTokens > 0) {
           usageDB.recordTokenUsage(data.project, data.totalTokens, 0);
           log(`JSONL tokens recorded: ${data.totalTokens.toLocaleString()} for ${data.project}`);
@@ -901,9 +894,6 @@ async function initializeServices() {
       });
 
       jsonlScanner.start();
-      if (isOAuthUser) {
-        log('JSONL scanner: running in cursor-only mode (OAuth user, tokens tracked via API)');
-      }
     }
   } catch (error) {
     log.error('Failed to start JSONL token scanner:', error);
