@@ -133,7 +133,7 @@ function initAutoUpdater() {
   try {
     const { autoUpdater } = require('electron-updater');
     updaterInstance = autoUpdater;
-    autoUpdater.autoDownload = false;  // We'll prompt the user first
+    autoUpdater.autoDownload = true;   // Download silently so updates apply even if UI has issues
     autoUpdater.autoInstallOnAppQuit = true;
 
     autoUpdater.on('checking-for-update', () => {
@@ -143,8 +143,8 @@ function initAutoUpdater() {
     });
 
     autoUpdater.on('update-available', (info) => {
-      log('Update available:', info.version);
-      updateState = { status: 'available', version: info.version, progress: 0, error: null };
+      log('Update available:', info.version, '— downloading automatically');
+      updateState = { status: 'downloading', version: info.version, progress: 0, error: null };
       sendUpdateStatus();
     });
 

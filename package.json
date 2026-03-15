@@ -1,6 +1,6 @@
 {
   "name": "alldaypoke",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "description": "A minimalist desktop widget showing Claude API usage with animated robot",
   "main": "main.js",
   "scripts": {
