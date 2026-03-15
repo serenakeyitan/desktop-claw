@@ -85,6 +85,11 @@ function setupEventListeners() {
   setupClickThrough();
 }
 
+// Global flag: when true the window stays fully interactive (no click-through).
+// Set by showPopup/hidePopup and onboarding so overlays remain clickable even
+// when the cursor isn't directly over them.
+let forceInteractive = false;
+
 function setupClickThrough() {
   let isMouseOverContent = false;
   const bubble = document.getElementById('bubble');
@@ -123,6 +128,10 @@ function setupClickThrough() {
   }
 
   document.addEventListener('mousemove', (e) => {
+    // When a popup/overlay has forced the window interactive, never
+    // re-enable click-through — the overlay's own hide logic clears the flag.
+    if (forceInteractive) return;
+
     const overRobot = isOverRobot(e);
     const overBubble = isOverBubble(e);
     const overOnboarding = isOverOnboarding(e);
@@ -149,6 +158,7 @@ function setupClickThrough() {
   });
 
   document.addEventListener('mouseleave', () => {
+    if (forceInteractive) return;
     if (!isDragging && !isResizing) {
       isMouseOverContent = false;
       window.electronAPI.setIgnoreMouseEvents(true);
@@ -376,13 +386,17 @@ function setupUpdateListener() {
   const dismissBtn = document.getElementById('update-dismiss');
 
   // Show/hide helpers that also toggle click-through so buttons are always
-  // clickable even if the popup appears under the cursor (no mousemove fires).
+  // clickable. We set the global `forceInteractive` flag so the mousemove
+  // handler in setupClickThrough() cannot re-enable click-through while the
+  // popup is visible — this was the root cause of the "unclickable" bug.
   function showPopup() {
     popup.classList.remove('hidden');
+    forceInteractive = true;
     window.electronAPI.setIgnoreMouseEvents(false);
   }
   function hidePopup() {
     popup.classList.add('hidden');
+    forceInteractive = false;
     // Let the normal mousemove handler decide; force click-through for now
     window.electronAPI.setIgnoreMouseEvents(true);
   }
@@ -521,7 +535,9 @@ function showOnboardingStep() {
   }
 
   if (onboardingStep >= ONBOARDING_STEPS.length) {
-    // Done — notify main process
+    // Done — notify main process and release click-through lock
+    forceInteractive = false;
+    window.electronAPI.setIgnoreMouseEvents(true);
     window.electronAPI.onboardingDone();
     return;
   }
@@ -555,6 +571,7 @@ function showOnboardingStep() {
   onboardingEl = tooltip;
 
   // Make sure we capture mouse events on the tooltip
+  forceInteractive = true;
   window.electronAPI.setIgnoreMouseEvents(false);
 
   tooltip.querySelector('#onboarding-next').addEventListener('click', (e) => {
@@ -570,6 +587,8 @@ function showOnboardingStep() {
       onboardingEl.remove();
       onboardingEl = null;
     }
+    forceInteractive = false;
+    window.electronAPI.setIgnoreMouseEvents(true);
     window.electronAPI.onboardingDone();
   });
 }
