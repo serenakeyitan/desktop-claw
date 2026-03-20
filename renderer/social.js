@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupProfileModal();
   setupContextMenu();
   setupSignOut();
+  setupMap();
   loadData();
 });
 
@@ -42,15 +43,20 @@ function setupMainTabs() {
 
       const rankingSection = document.getElementById('ranking-section');
       const statusSection = document.getElementById('status-section');
+      const mapSection = document.getElementById('map-section');
       const periodTabs = document.getElementById('period-tabs');
 
+      rankingSection.classList.add('hidden');
+      statusSection.classList.add('hidden');
+      mapSection.classList.add('hidden');
+      periodTabs.classList.add('hidden');
+
       if (currentTab === 'status') {
-        rankingSection.classList.add('hidden');
         statusSection.classList.remove('hidden');
-        periodTabs.classList.add('hidden');
+      } else if (currentTab === 'map') {
+        mapSection.classList.remove('hidden');
       } else {
         rankingSection.classList.remove('hidden');
-        statusSection.classList.add('hidden');
         periodTabs.classList.remove('hidden');
       }
 
@@ -82,6 +88,8 @@ async function loadData() {
     await loadGlobalRanking();
   } else if (currentTab === 'status') {
     await loadFriendStatus();
+  } else if (currentTab === 'map') {
+    await loadMapData();
   }
 }
 
@@ -781,6 +789,229 @@ function setupContextMenu() {
       menu.style.top = `${window.innerHeight - rect.height - 4}px`;
     }
   };
+}
+
+// ── World Map ────────────────────────────────────────────────────────────────
+
+// Simplified world map coastline paths (Mercator-projected, normalized 0–1)
+// Each sub-array is a polygon: [[x,y], [x,y], ...]
+const WORLD_COASTLINES = [
+  // North America
+  [[0.05,0.18],[0.08,0.15],[0.12,0.12],[0.15,0.10],[0.18,0.12],[0.21,0.15],[0.24,0.14],[0.27,0.16],[0.29,0.20],[0.28,0.24],[0.26,0.28],[0.23,0.30],[0.20,0.33],[0.18,0.36],[0.16,0.38],[0.14,0.40],[0.12,0.42],[0.11,0.44],[0.13,0.46],[0.15,0.44],[0.17,0.42],[0.19,0.40],[0.21,0.38],[0.24,0.36],[0.26,0.38],[0.25,0.40],[0.23,0.42],[0.21,0.45],[0.19,0.47],[0.17,0.48],[0.14,0.48],[0.12,0.47],[0.10,0.45],[0.08,0.43],[0.06,0.40],[0.05,0.37],[0.04,0.34],[0.03,0.30],[0.03,0.25],[0.04,0.21]],
+  // South America
+  [[0.22,0.48],[0.24,0.50],[0.26,0.52],[0.28,0.55],[0.30,0.58],[0.31,0.62],[0.32,0.66],[0.32,0.70],[0.31,0.74],[0.30,0.78],[0.28,0.82],[0.26,0.85],[0.24,0.87],[0.22,0.85],[0.21,0.82],[0.20,0.78],[0.19,0.74],[0.19,0.70],[0.20,0.66],[0.20,0.62],[0.20,0.58],[0.21,0.54],[0.21,0.50]],
+  // Europe
+  [[0.47,0.14],[0.49,0.16],[0.50,0.18],[0.51,0.21],[0.52,0.24],[0.51,0.27],[0.50,0.30],[0.49,0.32],[0.48,0.34],[0.47,0.32],[0.46,0.30],[0.45,0.28],[0.44,0.26],[0.44,0.23],[0.45,0.20],[0.46,0.17]],
+  // Africa
+  [[0.47,0.34],[0.49,0.36],[0.51,0.38],[0.53,0.40],[0.54,0.44],[0.55,0.48],[0.55,0.52],[0.55,0.56],[0.54,0.60],[0.53,0.64],[0.52,0.68],[0.50,0.72],[0.48,0.74],[0.46,0.72],[0.44,0.70],[0.43,0.66],[0.42,0.62],[0.42,0.58],[0.42,0.54],[0.43,0.50],[0.43,0.46],[0.44,0.42],[0.45,0.38],[0.46,0.36]],
+  // Asia
+  [[0.52,0.14],[0.55,0.12],[0.58,0.11],[0.62,0.10],[0.66,0.12],[0.70,0.14],[0.73,0.16],[0.76,0.18],[0.78,0.20],[0.80,0.23],[0.81,0.26],[0.82,0.30],[0.80,0.33],[0.78,0.36],[0.76,0.38],[0.73,0.40],[0.70,0.42],[0.68,0.44],[0.65,0.45],[0.62,0.44],[0.60,0.42],[0.58,0.40],[0.56,0.38],[0.54,0.36],[0.53,0.33],[0.52,0.30],[0.52,0.26],[0.52,0.22],[0.52,0.18]],
+  // Australia
+  [[0.78,0.58],[0.80,0.56],[0.83,0.55],[0.86,0.56],[0.88,0.58],[0.89,0.61],[0.88,0.64],[0.86,0.67],[0.84,0.69],[0.81,0.70],[0.79,0.68],[0.77,0.66],[0.76,0.63],[0.77,0.60]],
+];
+
+let mapLocations = [];
+
+function setupMap() {
+  const canvas = document.getElementById('world-map-canvas');
+  const enableBtn = document.getElementById('map-enable-location');
+
+  // Resize canvas to container
+  function resizeCanvas() {
+    const container = document.getElementById('map-container');
+    if (container) {
+      canvas.width = container.clientWidth;
+      canvas.height = Math.max(200, Math.floor(container.clientWidth * 0.53));
+    }
+  }
+
+  window.addEventListener('resize', () => {
+    resizeCanvas();
+    drawMap();
+  });
+
+  // Enable location button
+  if (enableBtn) {
+    enableBtn.addEventListener('click', async () => {
+      const result = await window.socialAPI.requestLocationPermission();
+      if (result.granted) {
+        await detectAndSaveLocation();
+        loadMapData();
+      }
+      updateConsentBanner();
+    });
+  }
+
+  // Tooltip on hover
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const tooltip = document.getElementById('map-tooltip');
+    let found = null;
+
+    for (const loc of mapLocations) {
+      const pos = latLngToCanvas(loc.lat, loc.lng, canvas.width, canvas.height);
+      const dx = mx - pos.x;
+      const dy = my - pos.y;
+      if (dx * dx + dy * dy < 64) { // 8px radius
+        found = loc;
+        break;
+      }
+    }
+
+    if (found) {
+      tooltip.textContent = `${found.display_name || found.username}${found.city ? ' — ' + found.city : ''}${found.country ? ', ' + found.country : ''}`;
+      tooltip.style.left = `${e.clientX - rect.left + 10}px`;
+      tooltip.style.top = `${e.clientY - rect.top - 24}px`;
+      tooltip.classList.remove('hidden');
+      canvas.style.cursor = 'pointer';
+    } else {
+      tooltip.classList.add('hidden');
+      canvas.style.cursor = 'default';
+    }
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    document.getElementById('map-tooltip').classList.add('hidden');
+  });
+
+  resizeCanvas();
+}
+
+function latLngToCanvas(lat, lng, w, h) {
+  // Mercator projection: lng → x linear, lat → y with mercator
+  const x = ((lng + 180) / 360) * w;
+  // Clamp latitude to avoid infinity
+  const latRad = Math.max(-85, Math.min(85, lat)) * Math.PI / 180;
+  const mercY = Math.log(Math.tan(Math.PI / 4 + latRad / 2));
+  const y = (0.5 - mercY / (2 * Math.PI)) * h;
+  return { x, y };
+}
+
+function drawMap() {
+  const canvas = document.getElementById('world-map-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+
+  // Clear
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(0, 0, w, h);
+
+  // Draw grid lines
+  ctx.strokeStyle = '#1a1a1a';
+  ctx.lineWidth = 0.5;
+
+  // Longitude lines every 30 degrees
+  for (let lng = -180; lng <= 180; lng += 30) {
+    const pos = latLngToCanvas(0, lng, w, h);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, 0);
+    ctx.lineTo(pos.x, h);
+    ctx.stroke();
+  }
+
+  // Latitude lines every 30 degrees
+  for (let lat = -60; lat <= 60; lat += 30) {
+    const pos = latLngToCanvas(lat, 0, w, h);
+    ctx.beginPath();
+    ctx.moveTo(0, pos.y);
+    ctx.lineTo(w, pos.y);
+    ctx.stroke();
+  }
+
+  // Draw coastlines
+  ctx.strokeStyle = '#2a2a2a';
+  ctx.lineWidth = 1;
+  ctx.fillStyle = '#151515';
+
+  for (const polygon of WORLD_COASTLINES) {
+    ctx.beginPath();
+    for (let i = 0; i < polygon.length; i++) {
+      const px = polygon[i][0] * w;
+      const py = polygon[i][1] * h;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // Draw user dots
+  for (const loc of mapLocations) {
+    const pos = latLngToCanvas(loc.lat, loc.lng, w, h);
+    const radius = loc.is_self ? 5 : 4;
+
+    // Glow
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, radius + 3, 0, Math.PI * 2);
+    if (loc.is_self) {
+      ctx.fillStyle = 'rgba(205, 127, 93, 0.2)';
+    } else if (loc.is_friend) {
+      ctx.fillStyle = 'rgba(57, 255, 20, 0.15)';
+    } else {
+      ctx.fillStyle = 'rgba(100, 100, 100, 0.1)';
+    }
+    ctx.fill();
+
+    // Dot
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+    if (loc.is_self) {
+      ctx.fillStyle = '#cd7f5d';
+    } else if (loc.is_friend) {
+      ctx.fillStyle = '#39ff14';
+    } else {
+      ctx.fillStyle = '#555';
+    }
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = loc.is_self ? '#e8a87c' : (loc.is_friend ? '#5aff3e' : '#666');
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+}
+
+async function updateConsentBanner() {
+  const banner = document.getElementById('map-consent-banner');
+  if (!banner) return;
+  const { consent } = await window.socialAPI.getLocationConsent();
+  if (consent === 'granted') {
+    banner.classList.add('hidden');
+  } else {
+    banner.classList.remove('hidden');
+  }
+}
+
+async function detectAndSaveLocation() {
+  const location = await window.socialAPI.getIpLocation();
+  if (location && !location.error) {
+    await window.socialAPI.updateLocation(location);
+  }
+}
+
+async function loadMapData() {
+  // Check consent and show banner if needed
+  await updateConsentBanner();
+
+  // Auto-detect location on first load if permission granted
+  const { consent } = await window.socialAPI.getLocationConsent();
+  if (consent === 'granted') {
+    // Detect and save in background (won't block map render)
+    detectAndSaveLocation().catch(() => {});
+  }
+
+  try {
+    mapLocations = await window.socialAPI.getFriendLocations();
+  } catch {
+    mapLocations = [];
+  }
+
+  drawMap();
 }
 
 // ── Auto-refresh every 30 seconds ───────────────────────────────────────────

@@ -19,11 +19,12 @@
       </div>
     </div>
 
-    <!-- Main Tabs (Friends / Global / Status) -->
+    <!-- Main Tabs (Friends / Global / Status / Map) -->
     <div id="main-tabs">
       <button class="main-tab active" data-tab="friends">Friends</button>
       <button class="main-tab" data-tab="global">Global</button>
       <button class="main-tab" data-tab="status">Status</button>
+      <button class="main-tab" data-tab="map">Map</button>
     </div>
 
     <!-- Period Tabs (Today / 7d / 30d / All) -->
@@ -54,6 +55,23 @@
     <!-- Status Tab Content (hidden by default) -->
     <div id="status-section" class="hidden">
       <div id="status-list"></div>
+    </div>
+
+    <!-- Map Tab Content (hidden by default) -->
+    <div id="map-section" class="hidden">
+      <div id="map-container">
+        <canvas id="world-map-canvas" width="600" height="320"></canvas>
+        <div id="map-tooltip" class="hidden"></div>
+      </div>
+      <div id="map-legend">
+        <span class="legend-item"><span class="legend-dot legend-self"></span> You</span>
+        <span class="legend-item"><span class="legend-dot legend-friend"></span> Friends</span>
+        <span class="legend-item"><span class="legend-dot legend-other"></span> Others</span>
+      </div>
+      <div id="map-consent-banner" class="hidden">
+        <span>Share your location on the map?</span>
+        <button id="map-enable-location" class="action-btn" style="padding:3px 8px;font-size:8px;">Enable</button>
+      </div>
     </div>
 
     <!-- Add Friend Panel -->

@@ -23,6 +23,13 @@ alter table public.profiles add column if not exists github_username text;
 -- Values: 'claude-oauth', 'claude-status', 'api-key', etc.
 alter table public.profiles add column if not exists auth_method text default 'claude-oauth';
 
+-- Migration: add location fields for world map feature
+-- Stores approximate lat/lng from IP geolocation (city-level accuracy)
+alter table public.profiles add column if not exists location_lat real;
+alter table public.profiles add column if not exists location_lng real;
+alter table public.profiles add column if not exists location_city text;
+alter table public.profiles add column if not exists location_country text;
+
 -- Enable RLS
 alter table public.profiles enable row level security;
 
@@ -259,6 +266,10 @@ begin
         p.auth_method,
         p.twitter_username,
         p.github_username,
+        p.location_lat,
+        p.location_lng,
+        p.location_city,
+        p.location_country,
         coalesce(sum(ul.delta_percent), 0) as total_usage,
         coalesce(sum(_tokens_for_row(ul.delta_percent, ul.tier, p.subscription_tier)), 0) as total_tokens,
         coalesce(sum(ul.active_time_ms), 0) as total_time_ms,
@@ -275,7 +286,7 @@ begin
          or p.id in (
            select friend_id from public.friendships where user_id = current_user_id
          )
-      group by p.id, p.username, p.display_name, p.subscription_tier, p.auth_method, p.twitter_username, p.github_username, us.is_vibing, us.current_project, us.last_active_at
+      group by p.id, p.username, p.display_name, p.subscription_tier, p.auth_method, p.twitter_username, p.github_username, p.location_lat, p.location_lng, p.location_city, p.location_country, us.is_vibing, us.current_project, us.last_active_at
       order by coalesce(sum(_tokens_for_row(ul.delta_percent, ul.tier, p.subscription_tier)), 0) desc
     ) r
   );
@@ -309,6 +320,10 @@ begin
         p.auth_method,
         p.twitter_username,
         p.github_username,
+        p.location_lat,
+        p.location_lng,
+        p.location_city,
+        p.location_country,
         coalesce(sum(ul.delta_percent), 0) as total_usage,
         coalesce(sum(_tokens_for_row(ul.delta_percent, ul.tier, p.subscription_tier)), 0) as total_tokens,
         coalesce(sum(ul.active_time_ms), 0) as total_time_ms,
@@ -321,7 +336,7 @@ begin
         on ul.user_id = p.id and ul.date >= cutoff
       left join public.user_status us
         on us.user_id = p.id
-      group by p.id, p.username, p.display_name, p.subscription_tier, p.auth_method, p.twitter_username, p.github_username, us.is_vibing, us.current_project, us.last_active_at
+      group by p.id, p.username, p.display_name, p.subscription_tier, p.auth_method, p.twitter_username, p.github_username, p.location_lat, p.location_lng, p.location_city, p.location_country, us.is_vibing, us.current_project, us.last_active_at
       order by coalesce(sum(_tokens_for_row(ul.delta_percent, ul.tier, p.subscription_tier)), 0) desc
       limit lim
     ) r

@@ -266,7 +266,7 @@ async function updateProfile(updates) {
   if (!user) throw new Error('Not logged in');
 
   // Only allow known fields
-  const allowed = ['display_name', 'twitter_username', 'github_username'];
+  const allowed = ['display_name', 'twitter_username', 'github_username', 'location_lat', 'location_lng', 'location_city', 'location_country'];
   const safe = {};
   for (const key of allowed) {
     if (key in updates) safe[key] = updates[key] || null;

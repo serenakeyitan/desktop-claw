@@ -33,4 +33,12 @@ contextBridge.exposeInMainWorld('socialAPI', {
   // Pokes
   sendPoke: (recipientId) => ipcRenderer.invoke('social-send-poke', recipientId),
   triggerSelfPoke: () => ipcRenderer.invoke('trigger-self-poke'),
+
+  // Location / Map
+  requestLocationPermission: () => ipcRenderer.invoke('social-request-location-permission'),
+  getIpLocation: () => ipcRenderer.invoke('social-get-ip-location'),
+  updateLocation: (location) => ipcRenderer.invoke('social-update-location', location),
+  getFriendLocations: () => ipcRenderer.invoke('social-get-friend-locations'),
+  getLocationConsent: () => ipcRenderer.invoke('social-get-location-consent'),
+  resetLocationConsent: () => ipcRenderer.invoke('social-reset-location-consent'),
 });

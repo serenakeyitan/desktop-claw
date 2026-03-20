@@ -1562,6 +1562,157 @@ ipcMain.handle('social-send-poke', async (event, recipientId) => {
   }
 });
 
+// ── IP Geolocation for World Map ─────────────────────────────────────────
+
+// Show a native dialog asking the user to share their location via IP
+ipcMain.handle('social-request-location-permission', async () => {
+  const config = loadConfig();
+
+  // Already granted or denied in this install
+  if (config.locationConsent === 'granted') return { granted: true };
+  if (config.locationConsent === 'denied') return { granted: false };
+
+  // Show native Electron dialog
+  const { response } = await dialog.showMessageBox({
+    type: 'question',
+    title: 'Share Your Location',
+    message: 'All Day Poke wants to show you on the world map',
+    detail: 'Your approximate location will be detected from your IP address and shared with friends. Only city-level accuracy is used — no precise GPS data.\n\nYou can change this later in settings.',
+    buttons: ['Allow', 'Don\'t Allow'],
+    defaultId: 0,
+    cancelId: 1,
+  });
+
+  const granted = response === 0;
+  config.locationConsent = granted ? 'granted' : 'denied';
+  saveConfig(config);
+  return { granted };
+});
+
+// Fetch the user's real IP geolocation using a free API
+ipcMain.handle('social-get-ip-location', async () => {
+  const config = loadConfig();
+  if (config.locationConsent !== 'granted') {
+    return { error: 'Location permission not granted' };
+  }
+
+  try {
+    const https = require('https');
+    const data = await new Promise((resolve, reject) => {
+      https.get('https://ipinfo.io/json', (res) => {
+        let body = '';
+        res.on('data', chunk => body += chunk);
+        res.on('end', () => {
+          try { resolve(JSON.parse(body)); }
+          catch (e) { reject(new Error('Invalid JSON from IP service')); }
+        });
+        res.on('error', reject);
+      }).on('error', reject);
+    });
+
+    if (!data.loc) return { error: 'No location in response' };
+
+    const [lat, lng] = data.loc.split(',').map(Number);
+    return {
+      lat,
+      lng,
+      city: data.city || null,
+      region: data.region || null,
+      country: data.country || null,
+    };
+  } catch (err) {
+    log.error('IP geolocation failed:', err.message);
+    return { error: err.message };
+  }
+});
+
+// Save location to Supabase profile
+ipcMain.handle('social-update-location', async (event, location) => {
+  if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') {
+    return { error: 'Invalid location' };
+  }
+  try {
+    const sb = supabaseClient.getSupabase();
+    if (!sb) return { error: 'Not connected' };
+    const user = await supabaseClient.getCurrentUser();
+    if (!user) return { error: 'Not logged in' };
+
+    const { error } = await sb
+      .from('profiles')
+      .update({
+        location_lat: location.lat,
+        location_lng: location.lng,
+        location_city: location.city || null,
+        location_country: location.country || null,
+      })
+      .eq('id', user.id);
+
+    if (error) return { error: error.message };
+    return { success: true };
+  } catch (err) {
+    return { error: err.message };
+  }
+});
+
+// Get friend + global user locations for the map
+ipcMain.handle('social-get-friend-locations', async () => {
+  try {
+    const sb = supabaseClient.getSupabase();
+    if (!sb) return [];
+    const user = await supabaseClient.getCurrentUser();
+    if (!user) return [];
+
+    // Get friends + self who have location set
+    const { data, error } = await sb
+      .from('profiles')
+      .select('id, username, display_name, location_lat, location_lng, location_city, location_country')
+      .not('location_lat', 'is', null)
+      .not('location_lng', 'is', null);
+
+    if (error) {
+      log.error('Failed to get friend locations:', error.message);
+      return [];
+    }
+
+    // Get friend IDs to mark who is a friend
+    const { data: friendships } = await sb
+      .from('friendships')
+      .select('friend_id')
+      .eq('user_id', user.id);
+
+    const friendIds = new Set((friendships || []).map(f => f.friend_id));
+
+    return (data || []).map(p => ({
+      user_id: p.id,
+      username: p.username,
+      display_name: p.display_name,
+      lat: p.location_lat,
+      lng: p.location_lng,
+      city: p.location_city,
+      country: p.location_country,
+      is_self: p.id === user.id,
+      is_friend: friendIds.has(p.id),
+    }));
+  } catch (err) {
+    log.error('Failed to get locations:', err.message);
+    return [];
+  }
+});
+
+// Check current location consent status
+ipcMain.handle('social-get-location-consent', () => {
+  const config = loadConfig();
+  return { consent: config.locationConsent || null };
+});
+
+// Reset location consent (allow re-prompting)
+ipcMain.handle('social-reset-location-consent', () => {
+  const config = loadConfig();
+  delete config.locationConsent;
+  saveConfig(config);
+  return { success: true };
+});
+
 // Self-poke: trigger the robot animation on the main widget
 ipcMain.handle('trigger-self-poke', () => {
   if (mainWindow && !mainWindow.isDestroyed()) {

@@ -846,3 +846,89 @@ body {
   #add-friend-panel { margin-top: 6px; padding-top: 6px; }
   #table-body { min-height: 80px; }
 }
+
+/* ── Map Section ── */
+#map-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 200px;
+}
+
+#map-container {
+  position: relative;
+  border: 1px solid #282828;
+  background: #0a0a0a;
+  flex: 1;
+  min-height: 200px;
+}
+
+#world-map-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#map-tooltip {
+  position: absolute;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  color: #e0e0e0;
+  font-size: 9px;
+  padding: 4px 8px;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 10;
+  letter-spacing: 0.3px;
+}
+
+#map-legend {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  padding: 8px 0 4px;
+  font-size: 8px;
+  color: #666;
+  letter-spacing: 0.5px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.legend-self {
+  background: #cd7f5d;
+  box-shadow: 0 0 4px rgba(205, 127, 93, 0.4);
+}
+
+.legend-friend {
+  background: #39ff14;
+  box-shadow: 0 0 4px rgba(57, 255, 20, 0.4);
+}
+
+.legend-other {
+  background: #555;
+}
+
+#map-consent-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 8px;
+  background: #151515;
+  border: 1px solid #282828;
+  border-top: none;
+  font-size: 9px;
+  color: #888;
+  letter-spacing: 0.3px;
+}
