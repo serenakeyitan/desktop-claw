@@ -1312,6 +1312,20 @@ function openSocialWindow() {
 
   socialWindow.loadFile(path.join(__dirname, 'renderer', 'social.html'));
   socialWindow.on('closed', () => { socialWindow = null; });
+
+  // Proactively prompt for location permission once the window is ready
+  // (only if the user hasn't been asked yet)
+  socialWindow.webContents.once('did-finish-load', () => {
+    const config = loadConfig();
+    if (!config.locationConsent) {
+      // Small delay so the window is visible before the dialog appears
+      setTimeout(() => {
+        if (socialWindow && !socialWindow.isDestroyed()) {
+          socialWindow.webContents.send('prompt-location-permission');
+        }
+      }, 1500);
+    }
+  });
 }
 
 // Open the window that was pending before login (e.g., Social Ranking)

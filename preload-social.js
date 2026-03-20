@@ -41,4 +41,7 @@ contextBridge.exposeInMainWorld('socialAPI', {
   getFriendLocations: () => ipcRenderer.invoke('social-get-friend-locations'),
   getLocationConsent: () => ipcRenderer.invoke('social-get-location-consent'),
   resetLocationConsent: () => ipcRenderer.invoke('social-reset-location-consent'),
+
+  // Events from main process
+  onPromptLocationPermission: (callback) => ipcRenderer.on('prompt-location-permission', callback),
 });

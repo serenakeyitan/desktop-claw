@@ -830,7 +830,7 @@ function setupMap() {
     drawMap();
   });
 
-  // Enable location button
+  // Enable location button (manual trigger from map tab banner)
   if (enableBtn) {
     enableBtn.addEventListener('click', async () => {
       const result = await window.socialAPI.requestLocationPermission();
@@ -841,6 +841,17 @@ function setupMap() {
       updateConsentBanner();
     });
   }
+
+  // Listen for proactive location prompt from main process
+  // This fires automatically ~1.5s after the social window opens (first time only)
+  window.socialAPI.onPromptLocationPermission(async () => {
+    const result = await window.socialAPI.requestLocationPermission();
+    if (result.granted) {
+      await detectAndSaveLocation();
+      // If user is on the map tab, refresh it
+      if (currentTab === 'map') loadMapData();
+    }
+  });
 
   // Tooltip on hover
   canvas.addEventListener('mousemove', (e) => {
